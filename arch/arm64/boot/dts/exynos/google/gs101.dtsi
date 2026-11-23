@@ -559,6 +559,13 @@
 			no-map;
 		};
 
+		ramoops_mem: ramoops@fd3ff000 {
+			compatible = "ramoops";
+			reg = <0x0 0xfd3ff000 0x00400000>;
+			console-size = <0x00200000>;
+			pmsg-size = <0x00200000>;
+		};
+
 		bldr_log_reserved: bldr-log-reserved@fd800000 {
 			reg = <0x0 0xfd800000 0x00100000>;
 			no-map;
