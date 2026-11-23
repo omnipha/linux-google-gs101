@@ -359,44 +359,90 @@ bulk pipe hangs.
 Host-side recovery attempts that did **not** restore the bulk pipe:
 `USBDEVFS_RESET`, `USBDEVFS_RESETEP`, `USBDEVFS_CLEAR_HALT`,
 `USBDEVFS_SETCONFIGURATION`, deauthorise/reauthorise, USB port power-cycle,
-xHCI controller unbind/rebind, and restarting the adb server. A full xHCI
-reset brings the device back on the bus, but the bulk pipe stays dead.
+driver unbind/rebind, and restarting the adb server. See the table in the next
+section: a port power-cycle *does* re-enumerate the device, but the bulk pipe
+stays dead — which is what establishes that the fault is device-side.
 
 **No partition was written during this attempt.** `fastboot stage` is a
 RAM-only operation; `boot`, `vendor_boot`, `dtbo` and `vbmeta` still contain
 the stock images, and the bootloader remains unlocked.
 
-**Required recovery:** physically re-plug the USB cable, or force a hardware
-restart with Power + Volume Down held for about 15 seconds. Then verify with:
+**Required recovery:** a restart of the bootloader on the device — physically
+re-plug the USB cable, or force a hardware restart with Power + Volume Down
+held for about 15 seconds. Then verify with:
 
 ```sh
 fastboot getvar version      # must answer, not time out
 ```
 
-A re-plug was performed by the owner at 14:27:16 local time: the device
-re-enumerated as a new USB device (number 6) with a fresh `18d1:4ee0`
-descriptor, which re-initialises the device-side USB stack. It dropped off the
-bus 10 seconds later and the port has reported `not attached` since, so no
-protocol probe was possible afterwards.
+Owner re-plugs on 2026-11-23 at 14:27:16 and 16:34 both restored a healthy
+pipe, confirming the recovery method.
+
+### Root cause of the USB wedge (device-side, confirmed)
+
+The wedge is **not** caused by transfer size and **not** by an interrupted
+transfer. It was reproduced on 2026-11-23 with **no payload transfer at all**:
+after a fresh enumeration the bootloader answered exactly two `getvar`
+commands and then stopped servicing the bulk endpoints.
+
+The actual trigger is a **fastboot command whose reply the host did not
+consume**. Two independent instances were observed:
+
+* `fastboot getvar all | head -12` — the pipe closed after `head` had taken
+  its twelve lines, so the bootloader's reply was never read.
+* A crash in the host tool between `download:<size>` and the read of its
+  `OKAY`/`DATA` reply.
+
+In both cases the bootloader is left with an unanswered command. It never
+re-arms its fastbulk endpoints afterwards, and the device stays in that state:
+
+| recovery attempt | result |
+| --- | --- |
+| `USBDEVFS_RESET` (before and after claiming the interface) | ioctl succeeds, endpoint stays dead |
+| `USBDEVFS_RESETEP` on `0x02` and `0x81` | ioctl succeeds, endpoint stays dead |
+| `USBDEVFS_CLEAR_HALT` on `0x02` and `0x81` | ioctl succeeds, endpoint stays dead |
+| deauthorise / reauthorise the device | no re-enumeration |
+| `bConfigurationValue` 0 → 1 | no re-enumeration |
+| driver unbind/bind of `1-1` | no re-enumeration |
+| USB port power cycle (`usb1-port1` disable → enable) | **new enumeration**, endpoint still dead |
+| USB port power cycle + full `fastboot` session | endpoint still dead |
+| resuming the abandoned download (first 64 KiB) | rejected — the bootloader is *not* waiting for data, its fastboot task is wedged |
+| three probes over three minutes | no device-side timeout recovery |
+
+The port power cycle proves the fault is **device-side**: the device
+re-enumerates with a fresh `18d1:4ee0` descriptor and a working control
+endpoint (enumeration, `fastboot devices`, and the USB string descriptors all
+still work), yet the bulk endpoints never come back. Only the *bootloader's*
+fastboot task is stuck.
+
+**Required recovery** is therefore a restart of the bootloader on the device:
+a physical re-plug of the USB cable, or a hardware restart with Power +
+Volume Down held for about 15 seconds. Verified working: an owner re-plug at
+16:34 restored a fully healthy pipe (`getvar:version` → `OKAY` in the same
+session), and `adb reboot bootloader` from Android also produces a clean
+enumeration.
 
 ### Refined test sequence
 
-The first attempt wedged the pipe while a 26 MB `fastboot stage` was in
-flight, and that transfer was interrupted by an aggressive `timeout`. Leaving
-the bootloader in a receive state is the most likely mechanism for the stall,
-so the sequence is revised to be safer:
+The sequence is executed by a single-session client
+(`/tmp/opencode/gs101/ram_boot.py`) that claims the USB interface exactly once
+and runs the whole sequence in one process, because a claim/release cycle
+between commands is an unnecessary risk. It also never reads a reply through a
+truncating pipe and never lets an exception escape between sending a command
+and reading its reply.
 
-1. `fastboot getvar version`, then `fastboot getvar all` — no data transfer,
-   confirms the pipe is alive.
-2. **`fastboot boot A-boot.img` without staging** — a 14.7 MB transfer that
-   needs no `stage` at all. If the bootloader falls back to the flashed
-   `vendor_boot` partition, this boots the repo kernel against the **stock**
-   DTB (which the stock `dtbo` overlays match) and the stock vendor ramdisk.
-   If the bootloader instead requires a staged `vendor_boot`, it answers with
-   a failure message — which is itself useful evidence and is non-destructive
-   either way.
-3. Only then `fastboot stage` the full candidates, with a generous timeout
-   (several minutes) so a transfer is never interrupted mid-flight.
+1. `getvar:version` — proves the pipe is alive before anything is sent.
+2. `download` + `stage` of the candidate `vendor_boot` (RAM only, 26 MB).
+3. `download` + `boot` of the candidate `boot` image (RAM only, 14.7 MB).
+4. Observe the device re-enumerating, then read back the early-boot evidence.
+
+**Probe hygiene (do not repeat the earlier mistakes):**
+
+* never pipe fastboot output through `head`/`tail` — that truncates the reply
+  and wedges the bootloader;
+* never crash between sending a command and reading its reply;
+* never interrupt a download mid-flight;
+* never read the device's serial number into a committed file.
 
 If step 2 returns to fastboot again, the kernel (or the bootloader's
 acceptance of it) is still the problem and the DTB hypothesis needs
@@ -421,6 +467,26 @@ the console output captured before any Linux userspace of ours runs, plus the
 reproducible build and hash records in this document. The region survives a
 warm reboot but not a full power loss, so it must be collected before the
 device is powered off.
+
+### State at the end of 2026-11-23
+
+The RAM-boot itself is still **not** executed. The bootloader's fastboot task
+is wedged device-side (see the table above) and needs a device-side restart.
+Everything needed for the test is prepared and verified:
+
+* candidates `A-boot.img` / `A-vendor_boot.img` / `B-boot.img` /
+  `B-vendor_boot.img` with hashes recorded below and re-verified;
+* the repo kernel with `CONFIG_PSTORE_RAM=y` and the `ramoops` node at
+  `0xfd3ff000` present in **both** candidate DTBs;
+* the initramfs carrying the 761 repo modules at the matching vermagic
+  `7.3.0-rc6-gs101`, with the postmarketOS stage-1 init that prints the
+  kernel console output to the framebuffer and the serial console;
+* a single-session fastboot client that runs `getvar` → `stage` → `boot`
+  without the reply-truncation and mid-transfer-abort mistakes that caused
+  the earlier wedges.
+
+The remaining action is a physical one: re-plug the USB cable (or hold Power +
+Volume Down for ~15 s) and then run the sequence.
 
 ## Safety notes
 
