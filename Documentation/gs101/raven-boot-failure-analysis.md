@@ -373,10 +373,54 @@ restart with Power + Volume Down held for about 15 seconds. Then verify with:
 fastboot getvar version      # must answer, not time out
 ```
 
-Before re-running the RAM-boot, note that `fastboot stage` transferred about
-26 MB before the endpoint died. If the same failure recurs, a smaller
-transfer should be tried first to distinguish a transport-size problem from
-a protocol problem.
+A re-plug was performed by the owner at 14:27:16 local time: the device
+re-enumerated as a new USB device (number 6) with a fresh `18d1:4ee0`
+descriptor, which re-initialises the device-side USB stack. It dropped off the
+bus 10 seconds later and the port has reported `not attached` since, so no
+protocol probe was possible afterwards.
+
+### Refined test sequence
+
+The first attempt wedged the pipe while a 26 MB `fastboot stage` was in
+flight, and that transfer was interrupted by an aggressive `timeout`. Leaving
+the bootloader in a receive state is the most likely mechanism for the stall,
+so the sequence is revised to be safer:
+
+1. `fastboot getvar version`, then `fastboot getvar all` — no data transfer,
+   confirms the pipe is alive.
+2. **`fastboot boot A-boot.img` without staging** — a 14.7 MB transfer that
+   needs no `stage` at all. If the bootloader falls back to the flashed
+   `vendor_boot` partition, this boots the repo kernel against the **stock**
+   DTB (which the stock `dtbo` overlays match) and the stock vendor ramdisk.
+   If the bootloader instead requires a staged `vendor_boot`, it answers with
+   a failure message — which is itself useful evidence and is non-destructive
+   either way.
+3. Only then `fastboot stage` the full candidates, with a generous timeout
+   (several minutes) so a transfer is never interrupted mid-flight.
+
+If step 2 returns to fastboot again, the kernel (or the bootloader's
+acceptance of it) is still the problem and the DTB hypothesis needs
+reconsidering; if it proceeds further than before, cause 1 is confirmed.
+
+### Evidence capture path for a failed boot
+
+Both DTBs provide a `ramoops` region at `0xfd3ff000` (stock DTB carries the
+same node natively; the mainline DTB now carries it via the change in
+`arch/arm64/boot/dts/exynos/google/gs101.dtsi`), and this kernel has
+`CONFIG_PSTORE_RAM=y`. A RAM-booted kernel therefore writes its console log
+into persistent RAM before it dies. After the subsequent warm reboot into the
+stock Android slot, the log can be read back without touching any partition:
+
+```sh
+adb shell ls /sys/fs/pstore/
+adb shell cat /sys/fs/pstore/console-ramoops-0
+```
+
+This is the intended early-boot evidence channel for acceptance criterion 3:
+the console output captured before any Linux userspace of ours runs, plus the
+reproducible build and hash records in this document. The region survives a
+warm reboot but not a full power loss, so it must be collected before the
+device is powered off.
 
 ## Safety notes
 
