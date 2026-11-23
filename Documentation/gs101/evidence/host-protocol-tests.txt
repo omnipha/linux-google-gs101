@@ -1,0 +1,67 @@
+=== GS101 issue #2 host-only fastboot protocol test run ===
+date: 2026-11-23T18:10:24+01:00
+fastboot: fastboot version 34.0.5-debian
+python: Python 3.14.4
+host: Linux 7.0.0-43-generic
+
+--- test_client_protocol (our client vs mock transport) ---
+test_against_the_mock_server_over_tcp (test_client_protocol.ProtocolTests.test_against_the_mock_server_over_tcp)
+End-to-end against mock_fastboot over the real TCP framing. ... ok
+test_command_has_no_trailing_nul (test_client_protocol.ProtocolTests.test_command_has_no_trailing_nul) ... ok
+test_command_rejects_nul_terminated_input (test_client_protocol.ProtocolTests.test_command_rejects_nul_terminated_input) ... ok
+test_download_data_handshake_and_exact_length (test_client_protocol.ProtocolTests.test_download_data_handshake_and_exact_length) ... ok
+test_download_fail_is_a_failure (test_client_protocol.ProtocolTests.test_download_fail_is_a_failure) ... ok
+test_download_rejects_data_as_completion (test_client_protocol.ProtocolTests.test_download_rejects_data_as_completion)
+The data phase must complete with OKAY, never DATA. ... ok
+test_download_rejects_wrong_announced_size (test_client_protocol.ProtocolTests.test_download_rejects_wrong_announced_size) ... ok
+test_getvar_failure (test_client_protocol.ProtocolTests.test_getvar_failure) ... ok
+test_getvar_success (test_client_protocol.ProtocolTests.test_getvar_success) ... ok
+test_info_packets_are_consumed (test_client_protocol.ProtocolTests.test_info_packets_are_consumed) ... ok
+test_info_then_fail_is_a_failure (test_client_protocol.ProtocolTests.test_info_then_fail_is_a_failure) ... ok
+test_refuses_write_commands (test_client_protocol.ProtocolTests.test_refuses_write_commands) ... ok
+test_short_writes_are_completed (test_client_protocol.ProtocolTests.test_short_writes_are_completed)
+A transport that accepts only 100 bytes per write must still ... ok
+test_stage_and_boot_ordering (test_client_protocol.ProtocolTests.test_stage_and_boot_ordering) ... ok
+test_stage_uses_a_plain_download_not_a_stage_command (test_client_protocol.ProtocolTests.test_stage_uses_a_plain_download_not_a_stage_command)
+AOSP: `fastboot stage` is a download; there is no "stage" wire ... ok
+test_text_packets_are_consumed (test_client_protocol.ProtocolTests.test_text_packets_are_consumed) ... ok
+test_timeout_is_not_success (test_client_protocol.ProtocolTests.test_timeout_is_not_success) ... ok
+test_transport_failure_is_not_success (test_client_protocol.ProtocolTests.test_transport_failure_is_not_success) ... ok
+test_unknown_status_is_a_protocol_error (test_client_protocol.ProtocolTests.test_unknown_status_is_a_protocol_error) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.308s
+
+OK
+
+--- test_real_fastboot (REAL installed AOSP fastboot vs mock TCP server) ---
+test_download_size_validation (test_real_fastboot.RealFastbootClientTests.test_download_size_validation)
+server-announced size must equal the bytes actually transferred. ... ok
+test_fail_is_reported_as_failure_not_success (test_real_fastboot.RealFastbootClientTests.test_fail_is_reported_as_failure_not_success)
+FAIL must be reported as a failure, never as a successful value. ... ok
+test_fail_on_boot_is_not_success (test_real_fastboot.RealFastbootClientTests.test_fail_on_boot_is_not_success)
+A FAIL to the boot command must be a non-zero failure. ... ok
+test_fail_on_download_reports_failure (test_real_fastboot.RealFastbootClientTests.test_fail_on_download_reports_failure)
+A FAIL to download: must not be followed by a data phase. ... ok
+test_getvar_no_trailing_nul (test_real_fastboot.RealFastbootClientTests.test_getvar_no_trailing_nul)
+Commands must be sent without a trailing NUL byte. ... ok
+test_getvar_unknown_variable_reports_failure (test_real_fastboot.RealFastbootClientTests.test_getvar_unknown_variable_reports_failure)
+A FAIL to getvar must be reported as a failure to the user. ... ok
+test_info_then_okay_reported_as_success (test_real_fastboot.RealFastbootClientTests.test_info_then_okay_reported_as_success)
+INFO packets then OKAY = success; INFO must be surfaced. ... ok
+test_no_flash_command_issued (test_real_fastboot.RealFastbootClientTests.test_no_flash_command_issued)
+stage/boot must never send flash/erase/format/flashing. ... ok
+test_no_reply_times_out_without_success (test_real_fastboot.RealFastbootClientTests.test_no_reply_times_out_without_success)
+No reply must time out and never be reported as a successful boot. ... ok
+test_stage_download_exact_length (test_real_fastboot.RealFastbootClientTests.test_stage_download_exact_length)
+`stage` = download:%08x -> DATA%08x -> exactly N bytes -> OKAY. ... ok
+test_stage_then_boot_single_connection (test_real_fastboot.RealFastbootClientTests.test_stage_then_boot_single_connection)
+stage + boot in one invocation = ONE connection, correct order. ... ok
+test_text_then_okay_reported_as_success (test_real_fastboot.RealFastbootClientTests.test_text_then_okay_reported_as_success)
+TEXT packets then OKAY = success. ... ok
+test_partial_tcp_reads_are_reassembled (test_real_fastboot.ShortWriteHandlingTests.test_partial_tcp_reads_are_reassembled) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 2.150s
+
+OK

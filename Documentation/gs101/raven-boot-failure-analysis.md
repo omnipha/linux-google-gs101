@@ -44,10 +44,13 @@ Reference (stock) factory images, `raven-cp3a.261005.002.a1`:
 Two independent defects were found in the failed candidate. Both are
 reproducible from the artifacts alone, without a device.
 
-### 1. DTBO overlay incompatibility (primary cause)
+### 1. DTBO overlay incompatibility (candidate cause 1)
 
-This explains the observed symptom most directly: the device returned to
-fastboot with no kernel output at all, on every attempt.
+This is the most direct host-reproducible explanation for the observed
+symptom: the device returned to fastboot with no kernel output at all, on
+every attempt. **It is an inference from host-side tests, not device
+evidence** — the bootloader source is not available and no kernel log was
+captured, so nothing here proves which step the bootloader reached.
 
 The bootloader applies the `dtbo` partition on **every** boot. The stock
 `dtbo.img` contains 18 overlay entries whose `__fixups__` sections reference
@@ -71,7 +74,7 @@ mainline tree, because mainline uses a different SoC-internal layout (for
 example the UART is at `/soc@0/usi@10a000c0/serial@10a00000` rather than
 `/serial@175B0000`).
 
-Applying a stock overlay to the mainline DTB fails:
+Applying a stock overlay to the mainline DTB fails **on the host**:
 
 ```
 $ fdtoverlay -i gs101-raven.dtb -o merged.dtb entry00.dtbo
@@ -80,10 +83,13 @@ base blob does not have a '/__symbols__' node, make sure you have compiled
 the base blob with '-@' option
 ```
 
-The candidate's DTB is byte-identical to the one built from this tree
-(`4cb8a443b01143cca707881849f5db40bbf747fcbf9c62f42bab0b84caf048af`), so the
-bootloader cannot apply the vendor overlays to it and aborts the boot before
-the kernel is entered.
+The failed candidate's DTB was byte-identical to the mainline build
+(`4cb8a443b01143cca707881849f5db40bbf747fcbf9c62f42bab0b84caf048af`). What is
+established is that the host-side overlay operation fails on it; what is
+**not** established is that the bootloader treats that failure as fatal. The
+conclusion "the bootloader aborts the boot before the kernel is entered" is a
+reasonable hypothesis consistent with the symptom, and it is the reason the
+next candidate carries the **stock** DTB instead.
 
 Note that the failed candidate was flashed with `vbmeta` verification disabled
 (`avbtool make_vbmeta_image --flags 2`) and it **still** returned to fastboot.
@@ -242,8 +248,10 @@ cause 1 from causes 2 and 3:
 | A         | stock `vendor_boot` DTB    | bootloader overlay applies; tests kernel + ramdisk |
 | B         | mainline `gs101-raven.dtb` | mainline DTB as shipped; tests whether the bootloader rejects it |
 
-If A boots and B does not, cause 1 is confirmed as the blocker and the fix is
+If A boots and B does not, cause 1 is supported as the blocker and the fix is
 to make the mainline DTB overlay-compatible (or to flash a matching `dtbo`).
+If both behave the same, cause 1 is not the differentiator and the remaining
+causes have to be re-examined.
 
 ### Build inputs
 
@@ -378,23 +386,29 @@ fastboot getvar version      # must answer, not time out
 Owner re-plugs on 2026-11-23 at 14:27:16 and 16:34 both restored a healthy
 pipe, confirming the recovery method.
 
-### Root cause of the USB wedge (device-side, confirmed)
+### The USB wedge (device-side, trigger not proven)
 
-The wedge is **not** caused by transfer size and **not** by an interrupted
-transfer. It was reproduced on 2026-11-23 with **no payload transfer at all**:
-after a fresh enumeration the bootloader answered exactly two `getvar`
-commands and then stopped servicing the bulk endpoints.
+Observed facts on 2026-11-23:
 
-The actual trigger is a **fastboot command whose reply the host did not
-consume**. Two independent instances were observed:
+* The wedge is **not** correlated with transfer size. It was reproduced with
+  **no payload transfer at all**: after a fresh enumeration the bootloader
+  answered exactly two `getvar` commands and then stopped servicing the bulk
+  endpoints.
+* The wedge is **not** fixed by any host-side action. A USB port power cycle
+  re-enumerates the device with a fresh `18d1:4ee0` descriptor and a working
+  control endpoint, yet the bulk endpoints stay dead. That is what places the
+  fault on the device rather than in the host or in the USB link.
+
+Observed correlation, **not** proven cause: in both observed instances the
+host had issued a fastboot command whose reply was not consumed —
 
 * `fastboot getvar all | head -12` — the pipe closed after `head` had taken
   its twelve lines, so the bootloader's reply was never read.
 * A crash in the host tool between `download:<size>` and the read of its
   `OKAY`/`DATA` reply.
 
-In both cases the bootloader is left with an unanswered command. It never
-re-arms its fastbulk endpoints afterwards, and the device stays in that state:
+In both cases the bootloader was left with an unanswered command, and it did
+not re-arm its fastbulk endpoints afterwards. The device stayed in that state:
 
 | recovery attempt | result |
 | --- | --- |
@@ -409,11 +423,17 @@ re-arms its fastbulk endpoints afterwards, and the device stays in that state:
 | resuming the abandoned download (first 64 KiB) | rejected — the bootloader is *not* waiting for data, its fastboot task is wedged |
 | three probes over three minutes | no device-side timeout recovery |
 
-The port power cycle proves the fault is **device-side**: the device
+The port power cycle shows that the fault is **device-side**: the device
 re-enumerates with a fresh `18d1:4ee0` descriptor and a working control
 endpoint (enumeration, `fastboot devices`, and the USB string descriptors all
 still work), yet the bulk endpoints never come back. Only the *bootloader's*
 fastboot task is stuck.
+
+What is **not** established: that an unconsumed reply is the *cause*. It is
+the only correlation observed so far, and the bootloader implementation is not
+available for inspection. Both candidate triggers — an unconsumed reply, and
+an unsupported/half-finished command sequence — would produce the same
+symptom.
 
 **Required recovery** is therefore a restart of the bootloader on the device:
 a physical re-plug of the USB cable, or a hardware restart with Power +
@@ -422,71 +442,139 @@ Volume Down held for about 15 seconds. Verified working: an owner re-plug at
 session), and `adb reboot bootloader` from Android also produces a clean
 enumeration.
 
-### Refined test sequence
+### The boot sequence actually used
 
-The sequence is executed by a single-session client
-(`/tmp/opencode/gs101/ram_boot.py`) that claims the USB interface exactly once
-and runs the whole sequence in one process, because a claim/release cycle
-between commands is an unnecessary risk. It also never reads a reply through a
-truncating pipe and never lets an exception escape between sending a command
-and reading its reply.
+The command sequence follows pmbootstrap's `boot_gki` action
+(`pmb/config/__init__.py`), which is:
 
-1. `getvar:version` — proves the pipe is alive before anything is sent.
-2. `download` + `stage` of the candidate `vendor_boot` (RAM only, 26 MB).
-3. `download` + `boot` of the candidate `boot` image (RAM only, 14.7 MB).
-4. Observe the device re-enumerating, then read back the early-boot evidence.
+```python
+"boot_gki": [
+    ["fastboot", "stage", "$BOOT/vendor_boot.img"],
+    ["fastboot", "boot",   "$BOOT/boot.img"],
+],
+```
+
+Two properties of the AOSP implementation matter here and were verified
+against the AOSP source and against the installed `fastboot` binary:
+
+* `fastboot stage FILE` performs a **plain download** — there is no `stage`
+  wire command. The wire traffic is `download:%08x`, then `DATA%08x`, then
+  exactly the announced number of bytes, then `OKAY`. The AOSP source for the
+  `stage` sub-command is `fb->Download(filename, buf.fd.get(), buf.sz)`.
+* `fastboot boot boot.img` sends the boot image **unchanged** when it starts
+  with the `ANDROID!` magic, so the image must already be a valid boot image.
+
+Both operations are RAM-only. Nothing in this sequence writes a partition.
+
+### Host-side tooling and its tests
+
+The host tooling was wrong before it was used against the device, so it was
+rewritten and tested **host-only** first, before any device command:
+
+* `Documentation/gs101/tests/mock_fastboot.py` — a mock fastboot server. It implements the AOSP
+  framing and refuses every partition-write command, so a test can prove that
+  the client never asks for a flash.
+* `Documentation/gs101/tests/fastboot_client.py` — the corrected protocol client. Commands carry
+  **no trailing NUL** (the AOSP README: *"without a trailing 0 byte"*);
+  `download:` must be answered with `DATA`, and the **data phase must
+  complete with `OKAY`**, never `DATA`; `INFO`/`TEXT` packets are consumed
+  and do not end the command; the announced size is checked against the
+  requested size; a `FAIL` or a timeout is raised as a failure and is never
+  reported as a successful boot; short writes are looped over.
+* `Documentation/gs101/tests/test_real_fastboot.py` — drives the **real installed AOSP `fastboot`
+  binary** against the mock over `-s tcp:` (the binary supports it), which
+  validates the wire behaviour of the tool that is actually used.
+* `Documentation/gs101/tests/test_client_protocol.py` — drives the new client against the in-memory
+  transport.
+
+Result: 32 host-only tests, all passing. The run is recorded in
+`Documentation/gs101/evidence/host-protocol-tests.txt`.
+
+Two facts were established by these tests rather than assumed:
+
+* the installed `fastboot` opens **one** connection for a whole invocation, so
+  `stage` and `boot` can be issued in a single process;
+* `fastboot` queries `getvar:max-download-size` before a download, which must
+  therefore be answered with an integer byte count.
 
 **Probe hygiene (do not repeat the earlier mistakes):**
 
-* never pipe fastboot output through `head`/`tail` — that truncates the reply
-  and wedges the bootloader;
+* never pipe fastboot output through `head`/`tail` — that truncates the reply;
 * never crash between sending a command and reading its reply;
 * never interrupt a download mid-flight;
 * never read the device's serial number into a committed file.
-
-If step 2 returns to fastboot again, the kernel (or the bootloader's
-acceptance of it) is still the problem and the DTB hypothesis needs
-reconsidering; if it proceeds further than before, cause 1 is confirmed.
 
 ### Evidence capture path for a failed boot
 
 Both DTBs provide a `ramoops` region at `0xfd3ff000` (stock DTB carries the
 same node natively; the mainline DTB now carries it via the change in
 `arch/arm64/boot/dts/exynos/google/gs101.dtsi`), and this kernel has
-`CONFIG_PSTORE_RAM=y`. A RAM-booted kernel therefore writes its console log
-into persistent RAM before it dies. After the subsequent warm reboot into the
-stock Android slot, the log can be read back without touching any partition:
+`CONFIG_PSTORE_RAM=y`. A RAM-booted kernel can therefore record its console
+log into persistent RAM before it dies, and after a subsequent warm reboot
+into the stock Android slot the log is intended to be readable without
+touching any partition:
 
 ```sh
 adb shell ls /sys/fs/pstore/
 adb shell cat /sys/fs/pstore/console-ramoops-0
 ```
 
-This is the intended early-boot evidence channel for acceptance criterion 3:
-the console output captured before any Linux userspace of ours runs, plus the
-reproducible build and hash records in this document. The region survives a
-warm reboot but not a full power loss, so it must be collected before the
-device is powered off.
+This is the intended early-boot evidence channel for acceptance criterion 3.
+It is **not yet demonstrated**: the readback has never been exercised on this
+device, the stock Android build may expose `/sys/fs/pstore` with different
+permissions (on the stock Android 17 build it was observed as
+`Permission denied` for the `adb shell` user), and the region does not
+survive a full power loss. If the readback is not available, the fallback
+evidence is the device's behaviour itself — whether it stays in fastboot,
+reboots, or enumerates a new USB device — together with the reproducible
+build and hash records in this document.
 
 ### State at the end of 2026-11-23
 
-The RAM-boot itself is still **not** executed. The bootloader's fastboot task
-is wedged device-side (see the table above) and needs a device-side restart.
-Everything needed for the test is prepared and verified:
+Everything needed for the test is prepared and verified on the host:
 
 * candidates `A-boot.img` / `A-vendor_boot.img` / `B-boot.img` /
   `B-vendor_boot.img` with hashes recorded below and re-verified;
-* the repo kernel with `CONFIG_PSTORE_RAM=y` and the `ramoops` node at
-  `0xfd3ff000` present in **both** candidate DTBs;
+* the repo kernel with `CONFIG_PSTORE_RAM=y`; the `ramoops` node at
+  `0xfd3ff000` is present in **both** candidate DTBs;
 * the initramfs carrying the 761 repo modules at the matching vermagic
-  `7.3.0-rc6-gs101`, with the postmarketOS stage-1 init that prints the
-  kernel console output to the framebuffer and the serial console;
-* a single-session fastboot client that runs `getvar` → `stage` → `boot`
-  without the reply-truncation and mid-transfer-abort mistakes that caused
-  the earlier wedges.
+  `7.3.0-rc6-gs101`, LZ4-legacy compressed like the stock ramdisk, with the
+  postmarketOS stage-1 init;
+* a corrected, host-tested fastboot client (see above) that runs
+  `getvar` → `stage` → `boot` without the reply-truncation and
+  mid-transfer-abort mistakes that preceded the earlier wedges.
 
-The remaining action is a physical one: re-plug the USB cable (or hold Power +
-Volume Down for ~15 s) and then run the sequence.
+### Candidate A versus the pmbootstrap package
+
+Two candidate sets exist and they are **not** interchangeable. The
+differences were verified with `unpack_bootimg` and are recorded in
+`Documentation/gs101/evidence/candidate-verification.txt`:
+
+| property | candidate A (this tree) | pmbootstrap `work-repo-kernel-issue1` |
+|---|---|---|
+| `boot.img` kernel | `38e331c4…` = repo `Image.lz4` | `589fc786…` (a different build) |
+| `vendor_boot` page size | `0x00000800` (stock) | `0x00001000` |
+| `vendor_boot` DTB | `3c7ded98…` = **stock** DTB | `4cb8a443…` = mainline DTB, no `__symbols__` |
+| vendor ramdisk | LZ4-legacy, 25 879 963 B | **ZSTD**, 12 794 920 B |
+| vendor ramdisk entries | 1 (type `0x1`) | 1 (type `0x1`) |
+| vendor cmdline | stock | pmOS (`pmos_boot_uuid=…`) |
+
+Two consequences for candidate A:
+
+* the DTB is byte-identical to the stock one, so it **has** a `__symbols__`
+  node with 809 entries and the stock `dtbo` overlays can be resolved
+  against it — this is what candidate B and the pmbootstrap package lack;
+* the stock `vendor_boot` has a **second** vendor ramdisk fragment,
+  `vendor_ramdisk01`, type `0x3` (`dlkm`), 5 955 534 B at offset 26 110 597.
+  Candidate A does not carry it, because the pmOS initramfs replaces the
+  vendor ramdisk contents. The bootloader's handling of a missing `dlkm`
+  fragment is not known.
+
+The pmbootstrap package additionally contains a flashable root filesystem
+(`google-raven.img`, 966 787 072 B, `8afc0d6a…`), which is what a *flashable*
+Linux package needs. Candidate A is a **RAM-boot test artifact only**: it
+carries the kernel and the initramfs, not the root filesystem, so it is not
+by itself a flashable package.
 
 ## Safety notes
 

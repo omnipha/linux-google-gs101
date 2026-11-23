@@ -1,0 +1,62 @@
+=== issue #2 candidate verification 2026-11-23T18:15:46+01:00 ===
+
+--- candidate A (cand2) ---
+c29a02d8c91051305008cbc35777475edff01454cd1025bf691a4b9e1c6c24c2  A-boot.img
+4cf79af30bffc6225c424e86b01a7c2a52dcc144bcd33fa3b234f5b17dca8683  A-vendor_boot.img
+
+--- unpacked structure ---
+boot magic: ANDROID!
+kernel_size: 14672794
+ramdisk size: 0
+os version: None
+os patch level: None
+boot image header version: 4
+command line args: 
+boot.img signature size: 0
+
+boot magic: VNDRBOOT
+vendor boot image header version: 4
+page size: 0x00000800
+kernel load address: 0x10008000
+ramdisk load address: 0x11000000
+vendor ramdisk total size: 25879963
+vendor command line args: earlycon=exynos4210,mmio32,0x10A00000 console=ttySAC0,115200n8 loglevel=8 clk_ignore_unused regulator_ignore_unused root=/dev/ram0 androidboot.boot_devices=14700000.ufs androidboot.hardware.platform=gs101 androidboot.wait_for_udc=true
+kernel tags load address: 0x10000100
+product name: 
+vendor boot image header size: 2128
+dtb size: 536176
+dtb address: 0x0000000011f00000
+vendor ramdisk table size: 108
+vendor ramdisk table: [
+    vendor_ramdisk00: {
+        size: 25879963
+        offset: 0
+        type: 0x1
+        name: 
+        board_id: [
+            0x00000000, 0x00000000, 0x00000000, 0x00000000,
+            0x00000000, 0x00000000, 0x00000000, 0x00000000,
+            0x00000000, 0x00000000, 0x00000000, 0x00000000,
+            0x00000000, 0x00000000, 0x00000000, 0x00000000,
+        ]
+    }
+]
+vendor bootconfig size: 107
+
+--- DTB identity ---
+3c7ded98045a87db61ad2a17b4f9185e58d29f1fecf2c01754eea00974136a0e  /tmp/opencode/gs101/verify/A-vendor/dtb
+3c7ded98045a87db61ad2a17b4f9185e58d29f1fecf2c01754eea00974136a0e  /tmp/opencode/gs101/verify/stock-vendor/dtb
+(candidate A dtb == stock dtb => stock dtbo overlays will apply)
+
+--- repo kernel Image.lz4 ---
+38e331c480b20772b4a3bd772285cb04e6598dec06e6c3d4fc7197e62973a561  /home/gregor/github_repos/linux-google-gs101/arch/arm64/boot/Image.lz4
+
+--- ramdisk format (stock vs A vs pmOS) ---
+02214c18  /tmp/opencode/gs101/verify/stock-vendor/vendor_ramdisk00
+02214c18  /tmp/opencode/gs101/verify/A-vendor/vendor_ramdisk00
+28b52ffd  /tmp/opencode/gs101/verify/pm-vendor/vendor_ramdisk00
+(02214c18 = LZ4 legacy, 28b52ffd = ZSTD)
+
+--- ramdisk module vermagic ---
+761
+vermagic=7.3.0-rc6-gs101 SMP preempt mod_unload aarch64
