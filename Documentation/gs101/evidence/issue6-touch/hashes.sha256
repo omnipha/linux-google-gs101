@@ -1,0 +1,4 @@
+f9c5c40bc86cc9343f57069455770ab63ac2ff434cce9a5c4902642abc95250e  /tmp/opencode/gs101/cand9/boot.img
+96bea502dc7425ee2a1fc1f55c0ddf9bd44b35232c415bb1ec64edc281bd3b8b  /tmp/opencode/gs101/cand9/vendor_boot.img
+9d22a5af9b3092e59df912a38d48e1503e217d3037dc804befda20bc1c5bc3fd  /tmp/opencode/gs101/cand9/raven-region.dtb
+e6170ddc083c199477607f8a641c26d132c9bb038c9f2ee8856e00076b55c5fb  drivers/input/touchscreen/sec_ts/sec_touch.ko

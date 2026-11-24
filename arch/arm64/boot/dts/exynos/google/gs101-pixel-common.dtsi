@@ -410,6 +410,8 @@
 				regulator-name = "dvdd_tsp";
 				regulator-min-microvolt = <1600000>;
 				regulator-max-microvolt = <1950000>;
+				regulator-always-on;
+				regulator-boot-on;
 			};
 
 			s2mpg10_ldo26m: ldo26m {
@@ -417,6 +419,8 @@
 				regulator-name = "avdd_ts";
 				regulator-min-microvolt = <2500000>;
 				regulator-max-microvolt = <3300000>;
+				regulator-always-on;
+				regulator-boot-on;
 			};
 
 			ldo27m {
@@ -836,6 +840,13 @@
 		samsung,pin-pud = <GS101_PIN_PULL_UP>;
 		samsung,pin-drv = <GS101_PIN_DRV_2_5_MA>;
 	};
+
+	aoc2ap_irq: aoc2ap-irq {
+		samsung,pins = "gpa8-6";
+		samsung,pin-function = <GS101_PIN_FUNC_EINT>;
+		samsung,pin-pud = <GS101_PIN_PULL_DOWN>;
+		samsung,pin-drv = <GS101_PIN_DRV_2_5_MA>;
+	};
 };
 
 &pinctrl_gpio_alive {
@@ -868,12 +879,6 @@
 		samsung,pins = "gpa9-0";
 		samsung,pin-function = <GS101_PIN_FUNC_EINT>;
 		samsung,pin-pud = <GS101_PIN_PULL_NONE>;
-		samsung,pin-drv = <GS101_PIN_DRV_2_5_MA>;
-	};
-	aoc2ap_irq: aoc2ap-irq {
-		samsung,pins = "gpa8-6";
-		samsung,pin-function = <GS101_PIN_FUNC_EINT>;
-		samsung,pin-pud = <GS101_PIN_PULL_DOWN>;
 		samsung,pin-drv = <GS101_PIN_DRV_2_5_MA>;
 	};
 };
@@ -977,7 +982,7 @@
 	status = "okay";
 };
 
-&spi_11 {
+&spi_touch {
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";

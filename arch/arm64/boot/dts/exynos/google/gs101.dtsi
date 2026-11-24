@@ -1516,7 +1516,7 @@
 				status = "disabled";
 			};
 
-			spi_11: spi@10d40000 {
+			spi_touch: spi@10d40000 {
 				compatible = "google,gs101-spi";
 				reg = <0x10d40000 0x30>;
 				#address-cells = <1>;

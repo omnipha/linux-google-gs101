@@ -1,0 +1,30 @@
+Candidate 9 Artifact Verification vs Reference cand6 / cand5:
+
+boot.img:
+  cand9 sha256: f9c5c40bc86cc9343f57069455770ab63ac2ff434cce9a5c4902642abc95250e
+  cand6 sha256: c2029af4dea0c30ba2d881d8535764d3404e4507c91d01e29a9cc014372bd069
+  cand9 size: 14684160 bytes
+  cand6 size: 14684160 bytes (exact match)
+  cand9 kernel size: 14676582 bytes
+  cand6 kernel size: 14676581 bytes (+1 byte diff due to TOUCHSCREEN_SEC_TS=m)
+  Header: version 4, magic ANDROID!, cmdline empty, os version None.
+
+vendor_boot.img:
+  cand9 sha256: 96bea502dc7425ee2a1fc1f55c0ddf9bd44b35232c415bb1ec64edc281bd3b8b
+  cand5 sha256: 97424a4dbad07269eabdca206cda885738e30c78f8f76cb3ec25cf5155465c55
+  cand9 size: 26423296 bytes
+  cand5 size: 26423296 bytes (exact match)
+  Header: version 4, magic VNDRBOOT, pagesize 2048, vendor_ramdisk size 25879963.
+  Vendor cmdline: identical byte-for-byte to cand5.
+  DTB region: 536176 bytes (exact match to stock 536176 geometry, two FDTs 268095/268081).
+
+Device Tree & Symbol Isolation:
+  spi_11 symbol -> redirected to /gs101-overlay-anchors/anchor-spi_11.
+  Vendor dtbo fragment@89 targeting spi_11 deposits into disabled anchor-spi_11 (inert).
+  Mainline SPI controller labeled spi_touch (/soc@0/usi@10d400c0/spi@10d40000).
+  touchscreen@0 cleanly declared under &spi_touch with compatible "sec,sec_ts".
+  vdd-supply -> &s2mpg10_ldo25m (1.8V dvdd_tsp, always-on).
+  avdd-supply -> &s2mpg10_ldo26m (3.3V avdd_ts, always-on).
+  Reset line: gpp26 0 (sec,reset_gpio and reset-gpios).
+  Interrupt line: gpa9 0 (sec,irq_gpio and interrupts).
+  Zero dead pinctrl handles; pinctrl core files untouched.

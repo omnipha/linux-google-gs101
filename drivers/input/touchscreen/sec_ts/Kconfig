@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: GPL-2.0-only
+config TOUCHSCREEN_SEC_TS
+	tristate "Samsung Electronics TouchScreen (sec_ts)"
+	depends on SPI
+	help
+	  Say Y or M here if you have a Samsung Electronics touchscreen controller
+	  (such as S6SY79x) connected via SPI.

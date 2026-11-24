@@ -111,15 +111,17 @@
 	};
 };
 
-&spi_11 {
+&spi_touch {
 	cs-gpios = <&gpp23 3 GPIO_ACTIVE_LOW>;
 	num-cs = <1>;
 	pinctrl-0 = <&spi11_bus &spi11_cs>;
 	pinctrl-names = "default";
 	status = "okay";
 
+	/delete-node/ touchscreen@0;
+
 	touchscreen@0 {
-		compatible = "samsung,s6sy791";
+		compatible = "sec,sec_ts";
 		reg = <0>;
 		spi-max-frequency = <10000000>;
 		spi-cpol;
@@ -127,10 +129,13 @@
 
 		interrupt-parent = <&gpa9>;
 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-		pinctrl-0 = <&ts_irq>;
-		pinctrl-names = "default";
 
+		sec,irq_gpio = <&gpa9 0 GPIO_ACTIVE_LOW>;
+		sec,reset_gpio = <&gpp26 0 GPIO_ACTIVE_LOW>;
 		reset-gpios = <&gpp26 0 GPIO_ACTIVE_LOW>;
+
+		sec,firmware_name = "s6sy79x.bin";
+		sec,max_coords = <1440 3120>;
 
 		vdd-supply = <&s2mpg10_ldo25m>;
 		avdd-supply = <&s2mpg10_ldo26m>;
