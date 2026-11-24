@@ -75,6 +75,22 @@ sudo -u user systemctl --user enable --now phosh-session.service
 echo "==> linger so the user manager (and Phosh) starts at boot without login"
 loginctl enable-linger user
 
+echo "==> no idle blank: with no touch the screen blanks after 300 s and the"
+echo "    connector is turned off ('connector Unknown-1: Turning off'), after"
+echo "    which grim reports 'no supported format found' until Phosh is restarted"
+sudo -u user env XDG_RUNTIME_DIR=/run/user/10000 \
+    DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus \
+    gsettings set org.gnome.desktop.session idle-delay 0
+sudo -u user env XDG_RUNTIME_DIR=/run/user/10000 \
+    DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus \
+    gsettings set org.gnome.settings-daemon.plugins.power idle-dim false
+sudo -u user env XDG_RUNTIME_DIR=/run/user/10000 \
+    DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus \
+    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout 0
+sudo -u user env XDG_RUNTIME_DIR=/run/user/10000 \
+    DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/10000/bus \
+    gsettings set org.gnome.settings-daemon.plugins.power sleep-inactive-battery-timeout 0
+
 echo "==> verify"
 sleep 8
 pgrep -x phoc && echo "phoc: running"

@@ -1,0 +1,55 @@
+# reboot autostart evidence (issue #5), captured 2026-11-24T19:31:22Z
+# reboot issued ~19:17 UTC via sshc.sh, device back after ~30 s
+
+## boot identity
+Linux mb010 7.3.0-rc6-gs101 #4 SMP PREEMPT Tue Nov 24 17:49:48 CET 2026 aarch64 Linux
+uptime
+uptime at capture:  14 min   (3rd run of phoc/phosh in this boot session)
+boot_id: d598cc70-6ae8-4b70-a0e4-b2bf30e1fa77
+
+## seatd.service
+active:    active
+enabled:   enabled
+
+## phosh-session.service (systemd --user)
+active:    active
+enabled:   enabled
+linger:    Linger=yes
+
+## unit Environment (as required)
+Environment=XDG_RUNTIME_DIR=/run/user/10000
+Environment=WLR_BACKENDS=drm,libinput
+Environment=WLR_DRM_DEVICES=/dev/dri/card0
+Environment=WLR_RENDERER=pixman
+
+## processes
+phoc:  6185
+phosh: 6214
+wayland socket: srwxr-xr-x    1 user     user             0 Nov 24 20:29 /run/user/10000/wayland-0
+
+## phoc log lines after this boot
+Nov 24 20:17:37 mb010 phoc[3606]: [backend/drm/drm.c:980] connector Unknown-1: Modesetting with 1440x3120 @ 60.000 Hz
+Nov 24 20:17:37 mb010 phoc[3606]: Output 'Unknown-1' added ('(null)'/'(null)'/'(null)'), 381mm x 825mm
+Nov 24 20:17:37 mb010 phoc[3606]: Enabling shell mode
+Nov 24 20:29:53 mb010 phoc[6185]: [backend/drm/backend.c:225] Initializing DRM backend for /dev/dri/card0 (simpledrm)
+Nov 24 20:29:53 mb010 phoc[6185]: [render/pixman/renderer.c:328] Creating pixman renderer
+Nov 24 20:29:53 mb010 phoc[6185]: [backend/drm/drm.c:980] connector Unknown-1: Modesetting with 1440x3120 @ 60.000 Hz
+Nov 24 20:29:53 mb010 phoc[6185]: Output 'Unknown-1' added ('(null)'/'(null)'/'(null)'), 381mm x 825mm
+Nov 24 20:29:53 mb010 phoc[6185]: Enabling shell mode
+
+## phosh log lines after this boot
+Nov 24 20:17:39 mb010 systemd[3594]: Reached target Phosh On Screen Keyboard.
+Nov 24 20:29:54 mb010 phosh[6214]: Phosh ready after 0.85s
+Nov 24 20:29:54 mb010 systemd[3594]: Reached target Phosh.
+Nov 24 20:29:54 mb010 systemd[3594]: Reached target Phosh On Screen Keyboard.
+
+## idle-blank finding
+Nov 24 20:22:39 mb010 phoc[3606]: [backend/drm/drm.c:984] connector Unknown-1: Turning off
+(gsettings org.gnome.desktop.session idle-delay was 300; set to 0 afterwards,
+see Documentation/gs101/phosh-simpledrm.md)
+
+## screenshot after reboot
+-rw-r--r--    1 user     user         36565 Nov 24 20:31 /tmp/check.png
+981dd699fc0eea8d3fc885bc298aa7bc  /tmp/check.png
+(ocr of phosh-lockscreen-after-reboot.png: 20:30 / Tuesday, November 24 / Slide up to unlock)
+

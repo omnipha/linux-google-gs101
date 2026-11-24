@@ -55,17 +55,35 @@ user unit and enables linger.
 4. **`dmesg -n 1` hides probe logs.** The console loglevel must be raised to
    reproduce kernel messages (`dmesg -n 8`) — see the touch diagnosis.
 
-## Boot / autostart
+## Boot / autostart — verified by reboot
 
-```sh
-systemctl --user is-enabled phosh-session   # enabled
-systemctl --user is-active  phosh-session   # active
-loginctl show-user user -p Linger           # Linger=yes
-```
+Reboot test executed on-device 2026-11-24 ~20:17 UTC (`sudo -n reboot` over
+USB SSH; device returned on `172.16.42.1` after ~30 s):
+
+| Check | Result after reboot |
+| --- | --- |
+| new boot id | `d598cc70-6ae8-4b70-a0e4-b2bf30e1fa77`, `up 4 min` |
+| `seatd.service` | `active` / `enabled` |
+| `phosh-session.service` (user) | `active` / `enabled` |
+| unit env | `WLR_BACKENDS=drm,libinput`, `WLR_DRM_DEVICES=/dev/dri/card0`, `WLR_RENDERER=pixman` |
+| processes | `phoc` + `phosh` running, wayland socket at `/run/user/10000/wayland-0` |
+| phoc log | `Initializing DRM backend for /dev/dri/card0 (simpledrm)`, `Creating pixman renderer`, `Modesetting with 1440x3120 @ 60.000 Hz`, `Phosh ready after 1.28s` |
+| USB SSH | preserved, `172.16.42.1` reachable |
+| screenshot | `phosh-lockscreen-after-reboot.png` — OCR: `20:30`, `Tuesday, November 24`, `Slide up to unlock` |
 
 Linger makes `user@.service` start at boot, so the Phosh unit starts without
-an interactive login. **The reboot test itself is still outstanding** — it
-needs an operator-controlled power cycle and a panel photo to confirm.
+an interactive login. **Autostart after reboot: verified.**
+
+### Idle blanking (reboot-test finding)
+
+Five minutes after boot the connector is turned off
+(`connector Unknown-1: Turning off`), and `grim` then fails with
+`no supported format found` until Phosh is restarted. Cause is the GNOME
+idle timer (`org.gnome.desktop.session idle-delay = 300`); there is no touch
+device, so nobody ever cancels the idle. The setup script now sets
+`idle-delay 0` and disables idle-dim/suspend timeouts; the post-reboot
+verification screenshot above was taken from the restarted session with the
+screen active.
 
 ## Evidence
 
@@ -74,6 +92,10 @@ needs an operator-controlled power cycle and a panel photo to confirm.
   OCR of the lock screen: `19:36`, `Tuesday, November 24`, `Slide up to unlock`
 - `evidence/issue5-phosh/phosh-after-synth-swipe.png` — same session after an
   injected touch swipe (hash differs; screen had blanked, swipe woke it)
+- `evidence/issue5-phosh/phosh-lockscreen-after-reboot.png` — 2026-11-24 20:30,
+  after the reboot autostart test: `Tuesday, November 24`, `Slide up to unlock`
+- `evidence/issue5-phosh/reboot-autostart.txt` — service/env/log lines captured
+  after the reboot
 - `evidence/issue5-phosh/touch-diagnosis.txt` — the touch root cause (below)
 
 ## Input
@@ -123,6 +145,5 @@ overlay anchor resolution) or an fts driver change. Tracked as its own issue.
 
 ## Not done yet
 
-- Reboot autostart confirmation (needs operator + panel photo).
-- Owner photo of the running Phosh session.
-- Touch (kernel/DT), GPU (panfrost 0x9202) — later, per issue #5.
+- Owner photo of the running Phosh session (still to be requested).
+- Touch (kernel/DT, issue #6) and GPU (panfrost 0x9202) — later, per issue #5.
