@@ -1,0 +1,107 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Overlay anchor labels for the Google GS101 (Raven) device tree.
+ *
+ * The stock Android bootloader applies one of the vendor dtbo overlays on
+ * top of the base device tree that is shipped in vendor_boot.  Those
+ * overlays reference nodes that only exist in the vendor device tree.
+ *
+ * A device tree blob that is used as the base of an overlay application
+ * must be built with dtc's "-@" option so that it carries a "/__symbols__"
+ * node.  Otherwise the bootloader fails with
+ *
+ *   FDT_ERR_BADOFFSET
+ *   base blob does not have a '/__symbols__' node
+ *
+ * and the device reports "Enter reason: boot failure".  Building with
+ * "-@" alone is still not sufficient: the overlays additionally reference
+ * label targets (see "__fixups__" in the vendor overlays) that have no
+ * counterpart in the upstream device tree.  Without them the overlay
+ * application fails with FDT_ERR_NOTFOUND.
+ *
+ * This file provides an inert anchor for every such label.  The anchors
+ * live in a single disabled node with a private compatible string, so
+ * that
+ *
+ *   - no upstream driver matches them,
+ *   - the kernel never instantiates a device for them,
+ *   - and the anchors do not shadow any real hardware description.
+ *
+ * Overlays that use one of these labels as a *target* deposit their
+ * content into the corresponding anchor node.  That content stays
+ * inert, because the anchor node itself is disabled and does not match
+ * any driver.
+ *
+ * The anchors must not be given a "status" of "okay": the overlay
+ * content is only useful for the subsystems that are not implemented
+ * upstream (display, audio DSP, modem, secure elements, ...), and
+ * enabling them would make the kernel probe hardware it cannot drive.
+ */
+
+/ {
+	gs101-overlay-anchors {
+		compatible = "google,gs101-overlay-anchors";
+		status = "disabled";
+
+		V_SYS_dummy: anchor-V_SYS_dummy { };
+		acpm_mbox_test: anchor-acpm_mbox_test { };
+		acpm_mfd_bus0: anchor-acpm_mfd_bus0 { };
+		acpm_mfd_bus1: anchor-acpm_mfd_bus1 { };
+		aoc: anchor-aoc { };
+		aoc_gpiochip: anchor-aoc_gpiochip { };
+		aoc_snd_card: anchor-aoc_snd_card { };
+		clock: anchor-clock { };
+		comp: anchor-comp { };
+		conn: anchor-conn { };
+		cp_msi_rmem: anchor-cp_msi_rmem { };
+		cp_rmem: anchor-cp_rmem { };
+		cp_rmem_1: anchor-cp_rmem_1 { };
+		cp_rmem_2: anchor-cp_rmem_2 { };
+		cp_tm1: anchor-cp_tm1 { };
+		cpufreq_domain0: anchor-cpufreq_domain0 { };
+		cpufreq_domain1: anchor-cpufreq_domain1 { };
+		cpufreq_domain2: anchor-cpufreq_domain2 { };
+		dai_be_haptic_rx: anchor-dai_be_haptic_rx { };
+		dai_be_tdm0_rx: anchor-dai_be_tdm0_rx { };
+		dai_be_tdm0_tx: anchor-dai_be_tdm0_tx { };
+		drmdsim0: anchor-drmdsim0 { };
+		drmdsim1: anchor-drmdsim1 { };
+		dsim_modes: anchor-dsim_modes { };
+		extcon: anchor-extcon { };
+		faceauth_model_heap: anchor-faceauth_model_heap { };
+		faceauth_preview_heap: anchor-faceauth_preview_heap { };
+		faceauth_rawimage_heap: anchor-faceauth_rawimage_heap { };
+		faceauth_tpu: anchor-faceauth_tpu { };
+		faceauth_tpu_dma_heap: anchor-faceauth_tpu_dma_heap { };
+		famodel: anchor-famodel { };
+		faprev: anchor-faprev { };
+		farawimg: anchor-farawimg { };
+		gpio_keys: anchor-gpio_keys { };
+		gsa: anchor-gsa { };
+		hs_tune_param: anchor-hs_tune_param { };
+		ls: anchor-ls { };
+		mali: anchor-mali { };
+		max98357a_hac: anchor-max98357a_hac { };
+		nvmem: anchor-nvmem { };
+		odm: anchor-odm { };
+		pcie_0: anchor-pcie_0 { };
+		pcie_1: anchor-pcie_1 { };
+		pdma0: anchor-pdma0 { };
+		pinctrl_0: anchor-pinctrl_0 { };
+		pinctrl_1: anchor-pinctrl_1 { };
+		pinctrl_4: anchor-pinctrl_4 { };
+		pinctrl_5: anchor-pinctrl_5 { };
+		pinctrl_6: anchor-pinctrl_6 { };
+		pinctrl_7: anchor-pinctrl_7 { };
+		regulators: anchor-regulators { };
+		s2mpu_hsi1: anchor-s2mpu_hsi1 { };
+		serial_16: anchor-serial_16 { };
+		ss_tune_param: anchor-ss_tune_param { };
+		sub_pd_hsi0: anchor-sub_pd_hsi0 { };
+		thermal_zones: anchor-thermal_zones { };
+		touch: anchor-touch { };
+		trip: anchor-trip { };
+		udc: anchor-udc { };
+		usbdrd_phy0: anchor-usbdrd_phy0 { };
+	};
+};

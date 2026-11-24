@@ -9,10 +9,44 @@
 /dts-v1/;
 
 #include "gs101-pixel-common.dtsi"
+#include "gs101-overlay-anchors.dtsi"
 
 / {
 	model = "Raven";
 	compatible = "google,gs101-raven", "google,gs101";
+	/*
+	 * The bootloader picks the base FDT out of the vendor_boot dtb
+	 * region by comparing this root property against the SoC revision
+	 * that is fitted.  The stock vendor_boot carries two concatenated
+	 * FDTs, soc_id <0x9845000 0x00> and <0x9845001 0x00>, and on this
+	 * unit the live /proc/device-tree is the second one (cal_if has
+	 * minmax_idx, exynos-acme/domain@0 has no max-volt, ip_ver is
+	 * 0x14020100, evt-ver is [01]).  Without the property the
+	 * bootloader has no selection key and reports
+	 * "Enter reason: boot failure".
+	 */
+	soc_id = <0x9845001 0x00>;
+
+	bootloader_log {
+		compatible = "google,bldr_log";
+		reg = <0x00 0xfd800000 0x80000 0x00 0xfd880000 0x80000>;
+		reg-names = "bl_log", "bl_old_log";
+		memory-region = <&bldr_log_reserved>;
+	};
+};
+
+&{/chosen} {
+	/*
+	 * The bootloader parses and rewrites this property: it strips
+	 * earlycon=, console= and androidboot.* tokens, keeps the rest and
+	 * appends its own vendor_cmdline and board suffix.  No serial
+	 * console token is used here (the UART is not broken out, and the
+	 * samsung early busyuart would spin unbounded if the UART clock is
+	 * off); early kernel log evidence comes from ramoops/pstore instead.
+	 * The pmOS initramfs keys are repeated in the vendor_boot
+	 * vendor_cmdline so they survive whichever channel is honoured.
+	 */
+	bootargs = "clocksource=arch_sys_counter root=/dev/ram0 firmware_class.path=/vendor/firmware reserve-fimc=0xffffff90f9fe0000 clk_ignore_unused loop.max_part=7 coherent_pool=4M no_console_suspend softlockup_panic=1 loglevel=8 regulator_ignore_unused pmos_boot_uuid=dcca49fa-fc71-498e-9f4f-09f2b80edaf1 pmos_root_uuid=0bcaadf4-9a11-4422-9a03-e297f1e97aaf pmos_rootfsopts=defaults";
 };
 
 &acpm_ipc {
