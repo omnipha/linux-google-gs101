@@ -45,7 +45,14 @@
 	 * off); early kernel log evidence comes from ramoops/pstore instead.
 	 * The pmOS initramfs keys are repeated in the vendor_boot
 	 * vendor_cmdline so they survive whichever channel is honoured.
+	 *
+	 * stdout-path is deleted: neither stock FDT in the vendor_boot
+	 * dtb region carries it, and console= on the command line sets
+	 * console_set_on_cmdline, which makes of_console_check() refuse
+	 * to turn the property into a preferred console.  It can select
+	 * nothing here either, so pstore/ramoops stays the only sink.
 	 */
+	/delete-property/ stdout-path;
 	bootargs = "clocksource=arch_sys_counter root=/dev/ram0 firmware_class.path=/vendor/firmware reserve-fimc=0xffffff90f9fe0000 clk_ignore_unused loop.max_part=7 coherent_pool=4M no_console_suspend softlockup_panic=1 loglevel=8 regulator_ignore_unused pmos_boot_uuid=dcca49fa-fc71-498e-9f4f-09f2b80edaf1 pmos_root_uuid=0bcaadf4-9a11-4422-9a03-e297f1e97aaf pmos_rootfsopts=defaults";
 };
 

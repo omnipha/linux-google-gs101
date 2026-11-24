@@ -8,11 +8,15 @@ It covers the reproduction of the failure from host-side evidence, the
 identified root cause, the diagnostics added to this tree, and the reproducible
 build and hash records for the next boot candidate.
 
-**Status of the device test:** the analysis and the candidate build are
-complete and verified on the host. The RAM-boot test itself has **not** been
-executed, because the device's USB bulk endpoint became unusable during the
-attempt and requires a physical re-plug to recover. See
-[Device test status](#device-test-status).
+**Status of the device test (2026-11-24):** the flash test **succeeded**.
+A candidate built from this repository was flashed to `boot`, `vendor_boot`
+and `userdata` on slot `_a` and booted into full Linux userspace: the repo
+kernel runs, the pmOS rootfs mounts, the USB gadget enumerates as
+`18d1:d001`, and both SSH and telnet answer over the USB link. The result is
+reproducible across a reboot. See [Device test result](#device-test-result).
+The earlier `fastboot stage` + `fastboot boot` RAM-boot attempt aborted and
+left the device's USB bulk endpoints unusable until a physical re-plug; see
+[Device test status](#device-test-status) for that history.
 
 ## Failed baseline
 
@@ -41,10 +45,23 @@ Reference (stock) factory images, `raven-cp3a.261005.002.a1`:
 
 ## Root cause
 
-Two independent defects were found in the failed candidate. Both are
-reproducible from the artifacts alone, without a device.
+Two independent defects were found in the failed candidate by inspecting the
+artifacts alone, without a device. A third candidate cause — DTBO overlay
+incompatibility — was also proposed and has since been **disproved** by the
+device test.
 
-### 1. DTBO overlay incompatibility (candidate cause 1)
+A candidate built from this tree, carrying fixes for all three, **boots** on
+the real device (see [Device test result](#device-test-result)). The device
+test does not isolate which of the fixes was the necessary one: several
+things changed together, so what is proven is that the combination works.
+
+### 1. DTBO overlay incompatibility (candidate cause 1 — DISPROVED)
+
+> **Superseded.** This section is kept for the historical record of the
+> original analysis. It is now known to be wrong: see
+> [The old "overlay incompatibility" hypothesis is disproved](#the-old-overlay-incompatibility-hypothesis-is-disproved),
+> which shows the stock overlays **do** resolve against this tree's DTB on the
+> real device. What follows was an inference from host-side tests only.
 
 This is the most direct host-reproducible explanation for the observed
 symptom: the device returned to fastboot with no kernel output at all, on
@@ -184,6 +201,28 @@ mainline tree: `debug_kinfo_reserved` ends at `0xfd3ff000` and
 
 ### Early console
 
+**Not used in the candidate that booted.** Neither `earlycon=` nor `console=`
+appears on the command line of the flashed image, and `/chosen/stdout-path` is
+**deleted** from `arch/arm64/boot/dts/exynos/google/gs101-raven.dts`. The
+reasoning is recorded in the comment on that property: the only path that can
+turn `stdout-path` into a console is `of_console_check()`, which returns false
+whenever the bootloader's `console=null` has already set
+`console_set_on_cmdline`, and the command-line path
+(`early_init_dt_scan_chosen_stdout()`) needs a bare `earlycon` token, which
+nothing provides. The property could therefore have selected nothing here, and
+`CONFIG_NULL_TTY=m` (not built-in) means the `ttynull` device the bootloader
+asks for cannot register either. The candidate matches the stock geometry
+instead: the live tree has no `/proc/device-tree/chosen/stdout-path`, and the
+only registered console is the ramoops legacy console:
+
+```
+[    0.032243] printk: legacy console [ramoops-1] enabled
+[    0.312196] Warning: unable to open an initial console.
+```
+
+The two conditions below are kept because they explain why **adding** a
+console later would need care.
+
 `drivers/tty/serial/samsung_tty.c` already provides an `OF_EARLYCON_DECLARE`
 handler for this platform:
 
@@ -210,28 +249,41 @@ line. This does not matter for the test, since the UART is not observable
 from the host in any case; pstore and the framebuffer are the practical
 channels.
 
-With the mainline DTB both channels work: `stdout-path` points at
-`serial_0`, whose compatible is `google,gs101-uart`, matching the `gs101`
-earlycon entry, and the driver binds and registers the console under the name
-`ttySAC` (`S3C24XX_SERIAL_NAME`). This matches the stock bootargs, which use
-`console=ttySAC0,115200n8`.
+With the mainline DTB the UART node would match the `gs101` earlycon entry and
+the driver would register the console under the name `ttySAC`
+(`S3C24XX_SERIAL_NAME`). That path is **not** used by the candidate that
+booted, because the bootloader's `console=null` disables command-line console
+selection and `stdout-path` is deleted — the live device confirms this with
+`Warning: unable to open an initial console.` and a single registered
+console, the ramoops one.
 
 Framebuffer output is available as a second channel: `gs101-raven.dts` enables
 `framebuffer-0` as a `simple-framebuffer` at 1440x3120 over `cont_splash_mem`,
 and the kernel is configured with `CONFIG_FRAMEBUFFER_CONSOLE=y` and
-`CONFIG_DRM_SIMPLEDRM=y`.
+`CONFIG_DRM_SIMPLEDRM=y`. This is the channel that actually produced
+pre-userspace evidence on the device: `simple-framebuffer` is initialised at
+0.937 s, before the pmOS initramfs starts.
 
 ### How to capture the early log
 
-1. Boot with the candidate (`fastboot stage` + `fastboot boot`, see below).
-2. On the next boot, the previous run's log is in the pstore filesystem.
+1. Boot with the candidate (flashed, as in [Device test result](#device-test-result)).
+2. If the kernel panics, the log of the failing run is in the pstore
+   filesystem of the **next** boot.
 3. Read it from a working userspace:
    ```
    adb shell ls /sys/fs/pstore/
    adb shell cat /sys/fs/pstore/console-ramoops-0
    ```
+   On the pmOS rootfs the same path is readable as root
+   (`/sys/fs/pstore` is mode `0750 root:root`, so `sudo -n cat` works).
    The ramoops region is persistent across reboots but not across a full
    power loss, so the log must be collected after the failing boot.
+
+   In the successful run this directory was **empty**, which is the expected
+   result for a kernel that did not crash: the ramoops backend registers
+   (`pstore: Registered ramoops as persistent store backend`) but only writes
+   on a panic. The early-boot evidence for the successful run therefore comes
+   from `dmesg` over SSH instead.
 
 The UART at `0x10A00000` is not broken out on the device, so the UART channel
 is not observable from the host; pstore and the framebuffer are the practical
@@ -252,6 +304,20 @@ If A boots and B does not, cause 1 is supported as the blocker and the fix is
 to make the mainline DTB overlay-compatible (or to flash a matching `dtbo`).
 If both behave the same, cause 1 is not the differentiator and the remaining
 causes have to be re-examined.
+
+**Outcome:** candidate A was tested by RAM-boot on 2026-11-23 and **did not
+boot** (it stayed in, or returned to, fastboot). That is what forced the
+decision to ship the mainline DTB. The candidate that ultimately booted is
+described in [Device test result](#device-test-result): it ships the
+mainline DTB as a **two-FDT region** (both FDTs carrying
+`soc_id = 0x9845001`) instead of the single mainline DTB of candidate B.
+
+The A/B plan above therefore did not distinguish the causes by itself. What
+the successful run does establish is listed under
+[Distinguishing bytes versus the failed trio](#distinguishing-bytes-versus-the-failed-trio):
+the mainline DTB region, the LZ4-legacy vendor ramdisk, the stock
+`0x800` page size and the matching module vermagic together produce a
+booting device.
 
 ### Build inputs
 
@@ -306,12 +372,47 @@ the first 32 612 352 bytes of the stock image exactly.
 
 ### Kernel command line
 
+The candidate that booted carries **no** `earlycon=` and **no** `console=`
+of its own. The bootloader appends `console=null` and the pmOS tokens come
+from two sources: `/chosen/bootargs` in the DTB and the `vendor_cmdline` of
+`vendor_boot.img`.
+
+The `vendor_cmdline` (215 bytes, 8 tokens, `cand4/vendor_cmdline.txt`):
+
 ```
-earlycon=<gs101|exynos4210>,mmio32,0x10A00000 console=ttySAC0,115200n8 \
-loglevel=8 clk_ignore_unused regulator_ignore_unused root=/dev/ram0 \
-androidboot.boot_devices=14700000.ufs androidboot.hardware.platform=gs101 \
-androidboot.wait_for_udc=true
+loglevel=8 clk_ignore_unused regulator_ignore_unused loop.max_part=7 \
+printk.devkmsg=on pmos_boot_uuid=dcca49fa-fc71-498e-9f4f-09f2b80edaf1 \
+pmos_root_uuid=0bcaadf4-9a11-4422-9a03-e297f1e97aaf pmos_rootfsopts=defaults
 ```
+
+Every non-pmOS token was verified to be a real kernel parameter
+(`__setup`/`early_param`); `ioremap_guard` and `reserve-fimc` are **not**
+kernel parameters in this tree and were therefore left out. The pmOS UUID
+tokens are intentionally kept out of the kernel parameter space by the pmOS
+init (they are read from the command line by the initramfs), and they are
+duplicated in `/chosen/bootargs` so that they survive whichever channel the
+bootloader honours.
+
+`pmos.debug-shell` is deliberately **not** set: it makes the initramfs start
+a telnetd on port 23 and wait for `pmos_continue_boot`, which blocks the boot.
+
+The resulting live command line on the device is:
+
+```
+clocksource=arch_sys_counter root=/dev/ram0 firmware_class.path=/vendor/firmware \
+reserve-fimc=0xffffff90f9fe0000 clk_ignore_unused loop.max_part=7 coherent_pool=4M \
+no_console_suspend softlockup_panic=1 loglevel=8 regulator_ignore_unused \
+pmos_boot_uuid=... pmos_root_uuid=... pmos_rootfsopts=defaults \
+loglevel=8 clk_ignore_unused regulator_ignore_unused loop.max_part=7 \
+printk.devkmsg=on pmos_boot_uuid=... pmos_root_uuid=... pmos_rootfsopts=defaults \
+console=null exynos_drm.panel_name=samsung-s6e3hc3 tcpci_max77759.conf_sbu=0 \
+ufs_pixel_fips140.* id_aa64mmfr1.vh=0 kvm-arm.mode=nvhe bootconfig
+```
+
+The duplication is expected: the same pmOS tokens appear once from the DTB
+`bootargs` and once from the `vendor_cmdline`. `console=null` and the
+`exynos_drm`/`ufs_pixel_fips140`/`kvm-arm` tokens are appended by the
+bootloader's own suffix.
 
 `quiet` is deliberately absent so that early output is not suppressed, and
 `loglevel=8` raises the console log level.
@@ -322,9 +423,13 @@ androidboot.wait_for_udc=true
 |----------|---------------|--------|
 | `Image` | 29 684 224 | `c8ba068448af2e9ac858c48fb66761ac052c201ba0118afb8f19bf3c4afe8a4a` |
 | `Image.lz4` | 14 672 794 | `38e331c480b20772b4a3bd772285cb04e6598dec06e6c3d4fc7197e62973a561` |
-| `gs101-raven.dtb` | 63 643 | `ab2081499148a2c69b869e9a57a54ce16b6e2fc9bd3138785bc88ed828b7c59e` |
+| `gs101-raven.dtb` (single, rebuilt) | 94 069 | `d1a170e6fde5ac27c3634da3a55a98694d340dd55dd99ffdf9ba0283a8373c02` |
+| `raven-region.dtb` (two-FDT, flashed) | 536 176 | `d3ca24573a9df941bc52655772b2db705ee936c1e5ba3e20d1fb0d7c7c44680c` |
 | `initramfs-repo.cpio` | 36 805 632 | `ccb3f6470a3288c4fd818f96e5bffa8ca60130995db1600e89f33f5aa26600fb` |
 | `vendor-ramdisk-lz4.img` | 25 879 963 | `7563f4611b03f61234170864a92fca93b91f8dded57522cf8864f483c2f3b7f0` |
+| `boot.img` (flashed) | 14 680 064 | `c29a02d8c91051305008cbc35777475edff01454cd1025bf691a4b9e1c6c24c2` |
+| `vendor_boot.img` (flashed) | 26 423 296 | `df84c78cc785e542fc32fd7cd7fc8783abdb96420bf4f6968532dd6feb5bda55` |
+| `google-raven-patched.img` (flashed as userdata) | 966 787 072 | `94bafb30083c40a64177480de75646c2b463679d9778c3212fb20a4714d68198` |
 | `A-boot.img` / `B-boot.img` | 14 680 064 | `c29a02d8c91051305008cbc35777475edff01454cd1025bf691a4b9e1c6c24c2` |
 | `A-vendor_boot.img` (stock DTB) | 26 425 344 | `4cf79af30bffc6225c424e86b01a7c2a52dcc144bcd33fa3b234f5b17dca8683` |
 | `B-vendor_boot.img` (mainline DTB) | 25 954 304 | `a2cdaf95ec514ee5b9219fc4ef5d36918ff1fcdc132d53799f9729131ab87c5a` |
@@ -342,9 +447,315 @@ Verification performed on the host:
   kernel release;
 * `unpack_bootimg` confirms vendor boot header version 4, page size `0x800`,
   DTB size 536 176 (A) / 63 643 (B), vendor ramdisk size 25 879 963, type
-  `0x1`, bootconfig size 107.
+  `0x1`, bootconfig size 107;
+* the **flashed** `vendor_boot.img` has an **empty** bootconfig (0 bytes)
+  instead of the stock 107-byte one, because `CONFIG_BOOT_CONFIG` is not set
+  in this kernel: `get_boot_config_from_initrd()` then returns `NULL`, the
+  bootconfig is never stripped from the initramfs, and the trailing bytes
+  would make the initramfs unpacker report `invalid magic at start of
+  compressed archive`. An empty bootconfig avoids that entirely; the failed
+  issue-#2 baseline also used an empty bootconfig.
 
-## Device test status
+## Device test result
+
+**Date:** 2026-11-24. **Device:** Pixel 6 Pro `raven`, slot `_a`, bootloader
+unlocked (`vbstate=orange`, `flashlocked=0`), stock build
+`google/raven/raven:17/CP3A.261005.002.A1/16269273`.
+
+Only `boot`, `vendor_boot` and `userdata` were written. `bootloader`, `radio`,
+`modem`, `efs`, `persist`, `vbmeta` and `dtbo` were **not** touched, the
+bootloader was not re-locked, and AVB was not weakened.
+
+### What was flashed
+
+| partition | artifact | size (bytes) | sha256 |
+|---|---|---|---|
+| `boot` | `cand4/boot.img` | 14 680 064 | `c29a02d8c91051305008cbc35777475edff01454cd1025bf691a4b9e1c6c24c2` |
+| `vendor_boot` | `cand4/vendor_boot.img` | 26 423 296 | `df84c78cc785e542fc32fd7cd7fc8783abdb96420bf4f6968532dd6feb5bda55` |
+| `userdata` | `cand3/google-raven-patched.img` → sparse | 966 787 072 (raw) | `94bafb30083c40a64177480de75646c2b463679d9778c3212fb20a4714d68198` |
+
+The `userdata` image is a GPT disk image carrying the pmOS partitions:
+
+| partition | type | UUID | label |
+|---|---|---|---|
+| p1 | ext2 | `dcca49fa-fc71-498e-9f4f-09f2b80edaf1` | `pmOS_boot` |
+| p2 | ext4 | `0bcaadf4-9a11-4422-9a03-e297f1e97aaf` | `pmOS_root` |
+
+Both UUIDs match the `pmos_boot_uuid=` and `pmos_root_uuid=` values carried in
+the `vendor_cmdline` and in `/chosen/bootargs`, which is what the pmOS init
+uses to find them.
+
+`userdata` was 966 787 072 bytes raw, which exceeds the device's
+`max-download-size` of `0xf900000` (261 095 424 bytes). It was converted with
+`img2simg` and flashed with `fastboot -S 240M`, which split the download into
+two sparse parts (245 747 KB + 44 731 KB). Both parts were accepted:
+
+```
+Sending sparse 'userdata' 1/2 (245747 KB)          OKAY [  7.021s]
+Writing 'userdata'                                 OKAY [  1.423s]
+Sending sparse 'userdata' 2/2 (44731 KB)           OKAY [  1.294s]
+Writing 'userdata'                                 OKAY [  0.238s]
+```
+
+### Build inputs
+
+| input | value |
+|---|---|
+| kernel | this tree, `main`, `arch/arm64/boot/Image.lz4`, 14 672 794 B, sha256 `38e331c4…` |
+| kernel release | `7.3.0-rc6-gs101` (no `+` suffix), matches the shipped modules |
+| DTB | `cand4/raven-region.dtb`, 536 176 B, sha256 `d3ca24573a9df941bc52655772b2db705ee936c1e5ba3e20d1fb0d7c7c44680c` |
+| vendor ramdisk | pmOS initramfs, LZ4-legacy, 25 879 963 B, sha256 `7563f461…` |
+| `vendor_cmdline` | 215 B, 8 tokens, `cand4/vendor_cmdline.txt` |
+| bootconfig | empty (0 bytes) — `CONFIG_BOOT_CONFIG` is not set in this kernel |
+| `vendor_boot` page size | `0x800` (stock geometry) |
+| initramfs modules | 770 modules, vermagic `7.3.0-rc6-gs101 SMP preempt mod_unload aarch64` |
+
+### The DTB region: two FDTs, both mainline
+
+The stock `vendor_boot` carries **two** back-to-back FDTs in its `dtb`
+partition region, exactly 536 176 bytes in total:
+
+| FDT | `totalsize` | root `soc_id` |
+|---|---|---|
+| `dtb0` | 268 095 | `0x9845000` |
+| `dtb1` | 268 081 | `0x9845001` |
+
+The live `/proc/device-tree` on the running device is `dtb1` (`soc_id`
+`0x9845001`), so the bootloader walks the region by `fdt_totalsize` and selects
+by the root `soc_id`.
+
+The candidate ships a region built the same way (`/tmp/opencode/gs101/build_dtb_region.py`):
+two FDTs, `268 095` and `268 081` bytes, **both** carrying
+`soc_id = <0x9845001 0x00>`. Every selection rule — walk-and-match, first, last,
+or "there are exactly two" — therefore resolves to the mainline DTB. The
+region was verified by walking it: two FDTs, `dtc` parse clean, `stdout-path`
+absent from both, `__symbols__` intact with 393 labels and 120 anchor
+references per FDT, and the region ends exactly at 536 176 bytes.
+
+### Early-boot evidence, before Linux userspace
+
+Captured from the running device with `dmesg` (the ramoops/pstore backend is
+registered but empty, because the kernel did not crash — pstore only fills on
+a panic):
+
+```
+[    0.000000] Linux version 7.3.0-rc6-gs101 (gregor@vmware007) (Ubuntu clang version 21.1.8, LLD 21.1.8) #2 SMP PREEMPT Mon Nov 23 09:40:54 CET 2026
+[    0.000000] KASLR enabled
+[    0.000000] Machine model: Raven DVT
+[    0.032243] printk: legacy console [ramoops-1] enabled
+[    0.032635] pstore: Registered ramoops as persistent store backend
+[    0.285714] sd 0:0:0:0: [sda] 31196160 4096-byte logical blocks: (128 GB/119 GiB)
+[    0.297884]  sda: sda1 sda2 sda3 ... sda27
+[    0.377690] [pmOS-rd]:   ❬❬ PMOS STAGE 1 ❭❭
+[    0.377716] [pmOS-rd]:   ❬❬ PMOS STAGE 2 ❭❭
+[    0.934445] [pmOS-rd]:   Setting up USB gadget through configfs
+[    0.937036] [drm] Initialized simpledrm 1.0.0 for chosen:framebuffer-0 on minor 0
+[    0.949753] configfs-gadget.g1 gadget.0: HOST MAC 32:xx:xx:xx:xx:75
+[    1.041017] [pmOS-rd]: Trying to start server with parameters: Server IP addr: 172.16.42.1:67, client IP addr: 172.16.42.2, interface: usb0
+[    2.394315] [pmOS-rd]: Mount subpartitions of /dev/sda27
+```
+
+Both acceptance-criterion-3 channels are present:
+
+* **Display / framebuffer** — `simple-framebuffer` is initialised at 0.937 s,
+  before any userspace, from the bootloader-provided `cont_splash_mem`:
+  `/dev/fb0` is `simpledrmdrmfb`, 1440x3120, 32 bpp, stride 5760;
+  `/dev/dri/card0` exists; `card0-Unknown-1` connector present.
+* **USB gadget logs** — the gadget is configured at 0.934 s and binds the
+  DWC3 UDC `11110000.usb`; the device enumerates on the host as
+  `18d1:d001` with a **CDC-NCM** interface.
+
+`Warning: unable to open an initial console.` is expected and harmless: the
+bootloader appends `console=null` to the command line, so the kernel has no
+serial console. The only registered console is the ramoops legacy console.
+
+### Userspace and connectivity
+
+The boot reaches full userspace — `systemd` is PID 1 and the pmOS rootfs is
+the real root:
+
+```
+$ uname -a
+Linux mb010 7.3.0-rc6-gs101 #2 SMP PREEMPT Mon Nov 23 09:40:54 CET 2026 aarch64 Linux
+
+$ cat /proc/mounts
+/dev/loop0p2 / ext4 rw,relatime 0 0
+/dev/loop0p1 /boot ext2 rw,nosuid,nodev,noexec,relatime 0 0
+configfs /sys/kernel/config configfs rw,nosuid,nodev,noexec,relatime 0 0
+none /sys/fs/pstore pstore rw,nosuid,nodev,noexec,relatime 0 0
+
+$ cat /proc/device-tree/soc_id | od -An -tx1
+ 09 84 50 01 00 00 00 00        # 0x9845001 -> the mainline DTB
+$ cat /proc/device-tree/model
+Raven DVT
+$ ls /proc/device-tree/chosen/stdout-path
+ls: ...: No such file or directory   # matches the stock geometry
+```
+
+Startup time is `2.909s` (kernel) + `2.099s` (userspace) = `5.009s`
+(`systemd-analyze`).
+
+**USB network.** The host enumerates the device as `18d1:d001` (the pmOS
+gadget VID:PID) and binds `cdc_ncm`:
+
+```
+Bus 001 Device 020: ID 18d1:d001 Google Inc. Nexus 4 (fastboot)
+  iInterface 5 CDC Network Control Model (NCM)
+enxXXXXXXXXXXXX  UP  172.16.42.2/24      # host, NetworkManager
+172.16.42.1      lladdr ba:xx:xx:xx:xx:2c  # device
+```
+
+Ping: 4/4 packets, 0% loss, ~2.8 ms.
+
+**SSH (port 22).** Answering, and the host key was generated on the device by
+`sshdgenkeys.service` on first boot:
+
+```
+ssh-ed25519  SHA256:8epfpng5UJI0nEMuM2XbOeunHgy1sLbT54uL5kCFQgY  172.16.42.1
+```
+
+Login as `user` with the pre-seeded key
+(`/home/user/.ssh/authorized_keys`, `vmware007-flash`) works and gives
+passwordless `sudo` (the account is in `wheel`).
+
+**Telnet (port 23).** Also available: `telnetd` is present in the rootfs
+(`/usr/sbin/telnetd`). A transient `systemd-run` instance was used to capture
+an interactive shell over the USB link, then stopped again:
+
+```
+/ # echo TELNET_WORKS
+TELNET_WORKS
+/ # uname -a
+Linux mb010 7.3.0-rc6-gs101 #2 SMP PREEMPT Mon Nov 23 09:40:54 CET 2026 aarch64 Linux
+/ # id
+uid=0(root) gid=0(root)
+```
+
+The listener was stopped afterwards and port 23 was confirmed closed, so no
+unauthenticated shell is left behind on the device.
+
+**Services.** `sshd` and `unudhcpd@usb0` are both `active`. The only failed
+unit is `getty@tty1.service` (no `tty1` because the console is `null`);
+`systemd-firstboot.service` fails on stdin and is harmless.
+
+### Repeatability
+
+The device was rebooted from inside the running system
+(`systemctl reboot`) and came back the same way:
+
+| time after reboot | observation |
+|---|---|
+| 5 s | no USB device |
+| 10 s | `18d1:d001` present, SSH port 22 open |
+
+The second boot reproduced the same initramfs trace
+(`PMOS STAGE 1` / `PMOS STAGE 2` / gadget setup / `Mount subpartitions of
+/dev/sda27`) and the same `simple-framebuffer` registration at 0.990 s.
+
+### Distinguishing bytes versus the failed trio
+
+The failed issue-#2 baseline and the candidate that boots differ in every
+image that was flashed, and in the boot-critical geometry:
+
+| artifact | failed trio | this candidate |
+|---|---|---|
+| `boot.img` | `bf4cbab0…` (15 683 584 B) | `c29a02d8…` (14 680 064 B) |
+| `boot.img` kernel payload | `589fc786…` (15 676 151 B) | `38e331c4…` = repo `Image.lz4` (14 672 794 B) |
+| `vendor_boot.img` | `6792724a…` (12 869 632 B) | `df84c78c…` (26 423 296 B) |
+| `vendor_boot` page size | `0x1000` | `0x800` (stock) |
+| `vendor_boot` DTB | 63 516 B, single mainline FDT, no `__symbols__` | 536 176 B, two-FDT mainline region, 393 `__symbols__` labels |
+| `vendor_ramdisk00` | **ZSTD**, 12 794 920 B | **LZ4-legacy**, 25 879 963 B |
+| `vendor_cmdline` | `quiet clk_ignore_unused regulator_ignore_unused pmos_boot_uuid=… pmos_root_uuid=… pmos_rootfsopts=defaults` | `loglevel=8 clk_ignore_unused regulator_ignore_unused loop.max_part=7 printk.devkmsg=on pmos_boot_uuid=… pmos_root_uuid=… pmos_rootfsopts=defaults` |
+| `vendor_boot` bootconfig | 0 B | 0 B |
+| `userdata` | `8afc0d6a…` (unpatched) | `94bafb30…` (pmOS rootfs patched) |
+
+The bytes-level differences that were deliberately changed from the failed
+baseline are therefore: the **kernel build** (this tree, matching module
+vermagic), the **vendor ramdisk compression** (LZ4-legacy instead of ZSTD),
+the **`vendor_boot` page size** (`0x800` instead of `0x1000`), the **`vendor_cmdline`**
+(`quiet` replaced by `loglevel=8 printk.devkmsg=on`, plus `loop.max_part=7`),
+the **DTB region** (two-FDT mainline region instead of a single mainline FDT)
+and the **`userdata` rootfs**.
+
+### The old "overlay incompatibility" hypothesis is disproved
+
+The previous version of this document listed "DTBO overlay incompatibility" as
+cause 1, on the grounds that the mainline DTB had no `__symbols__` node and
+therefore could not resolve the stock overlays' fixups. On the device this
+turns out to be **false** for this candidate:
+
+* the live `/proc/device-tree` contains the overlay-created nodes —
+  `max77759fg@36`, `max77729pmic@66`, `max77759tcpc@25` — **next to** the
+  mainline nodes `fuel-gauge@36`, `pmic@66` and `usb-typec@25`, i.e. the
+  overlay was applied on top of our DTB;
+* the region DTB's `__symbols__` contains **393** labels, and the union of
+  fixup labels required by all 18 stock overlays is **148** — every one of
+  them resolves (`missing=NONE` for each of `ov00`…`ov17`).
+
+The duplicate I²C nodes are a consequence of that overlay application: the
+overlay's `max77759fg@36` and the mainline `fuel-gauge@36` both describe
+address `0x36`, so the kernel logs `Failed to register i2c client ... (-16)`
+(`EEXIST`) and only one of the two binds per address. Observed bindings:
+`max77759` (PMIC at `0x66`), `maxtcpc` (Type-C at `0x25`), `max17042` (fuel
+gauge), `at24` (EEPROM at `0x50`). The `max77759tcpc` overlay node is the one
+that failed to bind at `0x25`; the mainline `usb-typec@25` node binds instead
+and the Type-C controller enumerates.
+
+What the evidence does **not** establish is which of the changed bytes is
+*necessary*. The candidate changed several things at once (kernel build,
+ramdisk compression, page size, DTB region, rootfs), so this run proves the
+combination boots, not which single change was the blocker. Isolating them
+would require further flashes.
+
+### Known remaining limitations
+
+These are real but do not block the boot:
+
+* **Display is the bootloader framebuffer, not a mainline panel driver.**
+  This tree has no `exynos_drm`/`samsung-s6e3hc3` panel support
+  (`/lib/modules/.../drivers/gpu/drm/exynos/` does not exist), so
+  `exynos_drm.panel_name=samsung-s6e3hc3` on the command line has no
+  consumer. `fb0` works, but it shows the bootloader splash, and the panel
+  timings/DSI are not driven by mainline. `panfrost` also fails
+  (`GPU model not found: mali-unknown id rev 0x9202 0x10`).
+* **No serial console.** The bootloader forces `console=null`, so the kernel
+  has no tty output; `getty@tty1` consequently fails. Logs are available via
+  `dmesg` over SSH and, after a panic, via ramoops/pstore.
+* **Five I²C clients fail to register** (`-16`, duplicate address), as
+  described above.
+* **`fuse` refuses to load**: `module fuse: .gnu.linkonce.this_module section
+  size must match the kernel's built struct module size at run time`. The
+  shipped `fuse.ko` was built against a different `struct module` layout than
+  the running kernel, so `fuse` is unavailable (relevant for `ntfs-3g`/
+  `sshfs`, not for the boot path).
+* **`/sys/fs/pstore` is empty**, which is the *correct* behaviour for a
+  non-crashing boot. The ramoops backend is registered
+  (`pstore: Registered ramoops as persistent store backend`), and
+  `systemd-pstore` is enabled and would archive a crash log.
+* **The `bootconfig` token on the command line is inert**, because
+  `CONFIG_BOOT_CONFIG` is not set; the kernel warns about it
+  (`WARNING: 'bootconfig' found on the kernel command line but
+  CONFIG_BOOT_CONFIG is not set`).
+
+### Evidence files
+
+The raw captures live in the session's evidence directory (not committed, as
+they contain device-specific data); the paths are listed in the handoff notes:
+
+| file | content |
+|---|---|
+| `flash-cand4-20261124-101151.log` | pre-state getvars, the three flash operations, reboot, re-enumeration |
+| `ssh-cand4-20261124-102644.log` | first boot: cmdline, `/proc/device-tree`, mounts, block devices |
+| `ssh-cand4-pstore-20261124-102715.log` | framebuffer, configfs gadget, UDC, loaded modules, unit states |
+| `ssh-cand4-root2-20261124-102813.log` | root dmesg head (early boot, t=0 …) |
+| `ssh-cand4-dmesg-20261124-102847.log` | full dmesg + filtered key markers |
+| `ssh-cand4-reboot2-20261124-103017.log` | second boot: pmOS stage trace, gadget, mounts |
+| `ssh-cand4-display-20261124-103140.log` | DRM/framebuffer details, SSH host keys, services |
+| `ssh-cand4-telnet-20261124-103253.log` | telnet session transcript |
+| `ssh-cand4-final-20261124-103458.log` | final acceptance snapshot |
+| `known_hosts-cand4` | device host keys (fingerprints quoted above) |
+
+
 
 The RAM-boot test was **not** completed. The sequence was:
 
@@ -509,27 +920,28 @@ Two facts were established by these tests rather than assumed:
 Both DTBs provide a `ramoops` region at `0xfd3ff000` (stock DTB carries the
 same node natively; the mainline DTB now carries it via the change in
 `arch/arm64/boot/dts/exynos/google/gs101.dtsi`), and this kernel has
-`CONFIG_PSTORE_RAM=y`. A RAM-booted kernel can therefore record its console
-log into persistent RAM before it dies, and after a subsequent warm reboot
-into the stock Android slot the log is intended to be readable without
-touching any partition:
+`CONFIG_PSTORE_RAM=y`. A kernel can therefore record its console log into
+persistent RAM before it dies, and after a subsequent reboot the log is
+readable without touching any partition:
 
 ```sh
 adb shell ls /sys/fs/pstore/
 adb shell cat /sys/fs/pstore/console-ramoops-0
 ```
 
-This is the intended early-boot evidence channel for acceptance criterion 3.
-It is **not yet demonstrated**: the readback has never been exercised on this
-device, the stock Android build may expose `/sys/fs/pstore` with different
-permissions (on the stock Android 17 build it was observed as
-`Permission denied` for the `adb shell` user), and the region does not
-survive a full power loss. If the readback is not available, the fallback
-evidence is the device's behaviour itself — whether it stays in fastboot,
-reboots, or enumerates a new USB device — together with the reproducible
-build and hash records in this document.
+This was **exercised on the device on 2026-11-24**: the backend registers
+(`pstore: Registered ramoops as persistent store backend`, `printk: legacy
+console [ramoops-1] enabled`) and `/sys/fs/pstore` is mounted and writable,
+but empty — because the boot did not fail, so nothing was written. The
+readback itself was therefore not demonstrated, and it is not needed for the
+successful run: the early-boot evidence there comes from `dmesg` (reachable
+over SSH once the userspace is up) and from the pre-userspace kernel markers
+in that log.
 
-### State at the end of 2026-11-23
+### State at the end of 2026-11-23 (superseded)
+
+> Historical record. The test was carried out on 2026-11-24 — see
+> [Device test result](#device-test-result).
 
 Everything needed for the test is prepared and verified on the host:
 
@@ -563,7 +975,9 @@ Two consequences for candidate A:
 
 * the DTB is byte-identical to the stock one, so it **has** a `__symbols__`
   node with 809 entries and the stock `dtbo` overlays can be resolved
-  against it — this is what candidate B and the pmbootstrap package lack;
+  against it — this is what the pmbootstrap package lacked. Note that
+  candidate A **still failed to boot**, so a resolvable overlay is clearly
+  not sufficient on its own;
 * the stock `vendor_boot` has a **second** vendor ramdisk fragment,
   `vendor_ramdisk01`, type `0x3` (`dlkm`), 5 955 534 B at offset 26 110 597.
   Candidate A does not carry it, because the pmOS initramfs replaces the
@@ -574,22 +988,43 @@ The pmbootstrap package additionally contains a flashable root filesystem
 (`google-raven.img`, 966 787 072 B, `8afc0d6a…`), which is what a *flashable*
 Linux package needs. Candidate A is a **RAM-boot test artifact only**: it
 carries the kernel and the initramfs, not the root filesystem, so it is not
-by itself a flashable package.
+by itself a flashable package. The flashing set that booted is the one
+described in [Device test result](#device-test-result).
 
 ## Safety notes
 
 * The bootloader was never re-locked and `vbmeta`/`AVB` verification was not
   weakened. The `avbtool make_vbmeta_image --flags 2` step from the previous
   session is **not** part of this candidate and is not required for it.
-* No writes to `bootloader`, `modem`, `radio`, `efs`, `persist` or any other
-  partition were performed.
+* **Exactly three partitions were written on 2026-11-24:** `boot`,
+  `vendor_boot` and `userdata`, on the active slot `_a`.
+* No writes to `bootloader`, `modem`, `radio`, `efs`, `persist`, `vbmeta`,
+  `vbmeta_system`, `vbmeta_vendor`, `dtbo`, `dtbo_a`, `dtbo_b`, `super` or any
+  other partition were performed. No `fastboot flashall`, `flash-all` script
+  or factory-image restore was run, and no AVB key or vbmeta image was
+  created.
+* The `userdata` write is the only destructive one: it replaced the previous
+  root filesystem image. The **source** image is preserved as
+  `google-raven.img.orig-8afc0d6a` (sha256 `8afc0d6a…`) outside this
+  repository, and the image that was flashed
+  (`google-raven-patched.img`, sha256 `94bafb30…`) was itself built from that
+  backup, so the original content is still recoverable.
+* An unauthenticated `telnetd` was started briefly for evidence capture and
+  **stopped again**; port 23 was verified closed afterwards. SSH remains the
+  normal access path.
 * The device serial number and any device-specific data are not recorded in
-  this repository.
+  this repository. The evidence files listed above are kept in the session's
+  working directory and are deliberately **not** committed here.
 
 ## References
 
 * [Issue #1](https://github.com/omnipha/linux-google-gs101/issues/1) — parent issue
 * [Issue #2](https://github.com/omnipha/linux-google-gs101/issues/2) — this analysis
 * `arch/arm64/boot/dts/exynos/google/gs101.dtsi` — ramoops reservation
+* `arch/arm64/boot/dts/exynos/google/gs101-raven.dts` — bootargs, framebuffer,
+  and the deleted `stdout-path`
 * `drivers/tty/serial/samsung_tty.c` — `OF_EARLYCON_DECLARE(gs101, ...)`
+* `drivers/of/fdt.c` — `early_init_dt_scan_chosen_stdout()` (bare-`earlycon`
+  path) and `of_console_check()`
+* `kernel/printk/printk.c` — `console_set_on_cmdline` set by `console=null`
 * `scripts/setlocalversion` — source of the `+` kernel release suffix
