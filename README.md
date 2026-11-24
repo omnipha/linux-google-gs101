@@ -30,12 +30,24 @@ On 2026-11-24 a candidate built from this tree booted on a real Pixel 6 Pro
 (`18d1:d001`, CDC-NCM) and passwordless `sudo` were verified, and the boot is
 repeatable across a reboot. Evidence and artifact hashes are recorded in
 [`Documentation/gs101/raven-boot-failure-analysis.md`](Documentation/gs101/raven-boot-failure-analysis.md).
-The display currently shows no mainline panel output (`fb0` is the bootloader
-framebuffer via `simpledrm`); this remains open. Image composition and device
+The display is still not driven by a mainline panel driver (`fb0` is the
+bootloader framebuffer via `simpledrm`, and there is no `exynos_drm` support
+for this SoC in this tree); that remains open. Image composition and device
 packaging are separate from this kernel tree. Before any further device boot
 or flash test, obtain explicit operator authorization and verify device
 identity, artifact checksums, partition/slot targets, backups and the
 device-specific recovery path.
+
+The framebuffer console path is now proven on the device: boot-time `printk()`
+output reaches the framebuffer console (a `CONFIG_CMDLINE_EXTEND`-appended
+`console=tty0`, because the bootloader strips every `console=` token from the
+device tree and `vendor_boot`), the console renders with a 16x32 font, and a
+getty login prompt appears on the panel. See
+[`Documentation/gs101/raven-display-console.md`](Documentation/gs101/raven-display-console.md).
+Phosh is not reachable with the current kernel and userland: the GS101 GPU is
+unrecognised by `panfrost` (no render node) and no touch input device probes,
+so the missing pieces are a GPU driver and a touch driver rather than
+packages.
 
 Do not commit private keys, passwords, serial numbers, device dumps, proprietary
 firmware blobs or other private data. Follow the kernel licensing notices in
