@@ -51,9 +51,21 @@
 	 * console_set_on_cmdline, which makes of_console_check() refuse
 	 * to turn the property into a preferred console.  It can select
 	 * nothing here either, so pstore/ramoops stays the only sink.
+	 *
+	 * console=tty0 selects the VT console so that printk() output
+	 * reaches the framebuffer console (VT -> fbcon -> /dev/fb0 ->
+	 * panel).  It has to come before the bootloader's own suffix,
+	 * because the bootloader appends console=null last and that token
+	 * would otherwise become the preferred console.  console_setup()
+	 * decodes "tty0" to the name "tty" with index 0, which is what
+	 * try_enable_preferred_console() matches against the VT console
+	 * driver (name "tty", index -1).  consoleblank=0 keeps the
+	 * framebuffer console from being blanked out, and
+	 * fbcon=font:TER16x32 selects a font that is legible on the
+	 * 1440x3120 panel.
 	 */
 	/delete-property/ stdout-path;
-	bootargs = "clocksource=arch_sys_counter root=/dev/ram0 firmware_class.path=/vendor/firmware reserve-fimc=0xffffff90f9fe0000 clk_ignore_unused loop.max_part=7 coherent_pool=4M no_console_suspend softlockup_panic=1 loglevel=8 regulator_ignore_unused pmos_boot_uuid=dcca49fa-fc71-498e-9f4f-09f2b80edaf1 pmos_root_uuid=0bcaadf4-9a11-4422-9a03-e297f1e97aaf pmos_rootfsopts=defaults";
+	bootargs = "clocksource=arch_sys_counter root=/dev/ram0 firmware_class.path=/vendor/firmware reserve-fimc=0xffffff90f9fe0000 clk_ignore_unused loop.max_part=7 coherent_pool=4M no_console_suspend softlockup_panic=1 loglevel=8 regulator_ignore_unused console=tty0 fbcon=font:TER16x32 consoleblank=0 pmos_boot_uuid=dcca49fa-fc71-498e-9f4f-09f2b80edaf1 pmos_root_uuid=0bcaadf4-9a11-4422-9a03-e297f1e97aaf pmos_rootfsopts=defaults";
 };
 
 &acpm_ipc {
