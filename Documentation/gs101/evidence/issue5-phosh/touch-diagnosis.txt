@@ -1,0 +1,121 @@
+# gs101 touch input diagnosis (issue #5) - captured 2026-11-24T19:05:02Z
+
+## 1) input devices present
+I: Bus=0019 Vendor=0001 Product=0001 Version=0100
+N: Name="gpio-keys"
+P: Phys=gpio-keys/input0
+S: Sysfs=/devices/platform/gpio-keys/input/input0
+U: Uniq=
+H: Handlers=kbd event0 
+B: PROP=0
+B: EV=3
+B: KEY=1c000000000000 0
+
+
+## 2) SPI devices on the SoC
+spi0.0
+--- spi0.0 modalias:
+spi:sec_ts
+--- of_node:
+../../../../../../../../firmware/devicetree/base/soc@0/usi@10d400c0/spi@10d40000/touchscreen@0
+
+## 3) DT node of the touch panel
+compatible:
+sec,sec_ts
+node:
+avdd-supply
+compatible
+controller-data
+fts,bus-reg-name
+fts,irq-flags
+fts,irq-gpio
+fts,pwr-reg-name
+fts,reset-gpio
+fts,reset-gpio-enable
+interrupt-parent
+interrupts
+name
+phandle
+pinctrl-0
+pinctrl-1
+pinctrl-names
+reg
+reset-gpios
+sec,encoded_enable
+sec,firmware_name
+sec,fod_coords
+sec,heatmap_mode
+sec,irq_gpio
+sec,max_coords
+sec,mis_cal_check
+sec,mm2px
+sec,panel_map
+sec,reset_gpio
+sec,touch_offload_id
+spi-cpha
+spi-cpol
+spi-max-frequency
+status
+vdd-supply
+
+## 4) fts driver of_match_table vs DT compatible
+driver of_match_table: st,spi   (drivers/input/touchscreen/fts_spi/fts.c:5151)
+driver spi_device_id : st,spi   (drivers/input/touchscreen/fts_spi/fts.c:5181)
+DT compatible         : sec,sec_ts  -> of_driver_match_device() fails
+
+## 5) kernel warning at boot
+
+## 6) forced bind attempt (driver_override) -> probe abort
+fts
+tee: /sys/bus/spi/drivers/fts/bind: I/O error
+
+## 7) decisive kernel log line
+7,5043,6464721464,-;spi spi0.0: bus: 'spi': __driver_probe_device: matched device with driver fts
+ DEVICE=+spi:spi0.0
+7,5044,6464721528,-;spi spi0.0: bus: 'spi': really_probe: probing driver fts with device
+ DEVICE=+spi:spi0.0
+7,5045,6464721603,-;fts spi0.0: no pinctrl handle
+ DEVICE=+spi:spi0.0
+7,5046,6537519188,-;spi spi0.0: bus: 'spi': __driver_probe_device: matched device with driver fts
+ DEVICE=+spi:spi0.0
+7,5047,6537519400,-;spi spi0.0: bus: 'spi': really_probe: probing driver fts with device
+ DEVICE=+spi:spi0.0
+
+## 8) pinctrl groups referenced by the touch node live outside any pinctrl controller
+pinctrl-0 phandles:
+ 00 00 01 f7 00 00 01 f8 00 00 01 f9 00 00 01 fa
+ 00 00 01 fb 00 00 01 fc
+pinctrl-1 phandles:
+ 00 00 01 fd 00 00 01 fe 00 00 01 ff
+pinctrl-names:
+on_state
+off_state
+
+## 9) resolution of those phandles
+0x57 /soc@0/pinctrl@174d0000/gpa9-gpio-bank
+0x58 /soc@0/pinctrl@10c40000/gpp26-gpio-bank
+0x1f7 /gs101-overlay-anchors/anchor-pinctrl_0/ts-irq
+0x1f8 /gs101-overlay-anchors/anchor-pinctrl_5/ts-reset
+0x1f9 /gs101-overlay-anchors/anchor-pinctrl_5/ap2aoc
+0x1fa /gs101-overlay-anchors/anchor-pinctrl_0/aoc2ap-irq
+0x1fb /gs101-overlay-anchors/anchor-pinctrl_5/ts_spi_bus_active
+0x1fc /gs101-overlay-anchors/anchor-pinctrl_5/ts_spi_cs_active
+0x1fd /gs101-overlay-anchors/anchor-pinctrl_5/ts_spi_bus_sleep
+0x1fe /gs101-overlay-anchors/anchor-pinctrl_5/ts_spi_miso_sleep
+0x1ff /gs101-overlay-anchors/anchor-pinctrl_5/ts_spi_cs_sleep
+
+## 10) pinctrl controller nodes that DO have a parent chain
+--- registered pinctrl controllers:
+10840000.pinctrl-samsung-pinctrl
+10c40000.pinctrl-samsung-pinctrl
+11840000.pinctrl-samsung-pinctrl
+14440000.pinctrl-samsung-pinctrl
+174d0000.pinctrl-samsung-pinctrl
+174e0000.pinctrl-samsung-pinctrl
+17940000.pinctrl-samsung-pinctrl
+--- pin group node has no pinctrl controller parent (overlay anchor only):
+name
+phandle
+samsung,pin-drv
+samsung,pin-pud
+samsung,pins

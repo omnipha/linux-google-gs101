@@ -1,0 +1,44 @@
+# Phosh on gs101 (issue #5) - device state capture
+# date (device): 2026-11-24T19:04:53Z
+
+## kernel
+Linux mb010 7.3.0-rc6-gs101 #4 SMP PREEMPT Tue Nov 24 17:49:48 CET 2026 aarch64 Linux
+PRETTY_NAME="Nura edge"
+NAME="Nura"
+VERSION_ID="edge"
+
+## compositor + shell processes
+9730 /usr/bin/phoc
+9760 /usr/libexec/phosh
+9742 /usr/libexec/gnome-session-init-worker
+9751 /usr/libexec/gnome-session-ctl
+9754 /usr/libexec/gnome-session-service
+
+## systemd user service
+enabled
+active
+Id=phosh-session.service
+FragmentPath=/home/user/.config/systemd/user/phosh-session.service
+UnitFileState=enabled
+ExecStart={ path=/usr/bin/phosh-session ; argv[]=/usr/bin/phosh-session ; ignore_errors=no ; start_time=[n/a] ; stop_time=[n/a] ; pid=0 ; code=(null) ; status=0/0 }
+
+## linger (autostart without login)
+Linger=yes
+
+## session files
+-rw-r--r--    1 user     user           456 Nov 24 19:36 /home/user/.config/systemd/user/phosh-session.service
+srwxr-xr-x    1 user     user             0 Nov 24 19:36 /run/user/10000/wayland-0
+
+## key phoc log lines (drm/pixman/modeset)
+Nov 24 19:34:29 mb010 phoc[7229]: [render/pixman/renderer.c:328] Creating pixman renderer
+Nov 24 19:34:29 mb010 phoc[7229]: [backend/drm/drm.c:980] connector Unknown-1: Modesetting with 1440x3120 @ 60.000 Hz
+Nov 24 19:34:29 mb010 phoc[7229]: Output 'Unknown-1' added ('(null)'/'(null)'/'(null)'), 381mm x 825mm
+Nov 24 19:35:33 mb010 phoc[8553]: [backend/drm/backend.c:225] Initializing DRM backend for /dev/dri/card0 (simpledrm)
+Nov 24 19:35:33 mb010 phoc[8553]: [render/pixman/renderer.c:328] Creating pixman renderer
+Nov 24 19:35:33 mb010 phoc[8553]: [backend/drm/drm.c:980] connector Unknown-1: Modesetting with 1440x3120 @ 60.000 Hz
+Nov 24 19:35:33 mb010 phoc[8553]: Output 'Unknown-1' added ('(null)'/'(null)'/'(null)'), 381mm x 825mm
+Nov 24 19:36:45 mb010 phoc[9730]: [backend/drm/backend.c:225] Initializing DRM backend for /dev/dri/card0 (simpledrm)
+Nov 24 19:36:45 mb010 phoc[9730]: [render/pixman/renderer.c:328] Creating pixman renderer
+Nov 24 19:36:45 mb010 phoc[9730]: [backend/drm/drm.c:980] connector Unknown-1: Modesetting with 1440x3120 @ 60.000 Hz
+Nov 24 19:36:45 mb010 phoc[9730]: Output 'Unknown-1' added ('(null)'/'(null)'/'(null)'), 381mm x 825mm
+Nov 24 19:45:29 mb010 phoc[9730]: [backend/drm/drm.c:980] connector Unknown-1: Modesetting with 1440x3120 @ 60.000 Hz
