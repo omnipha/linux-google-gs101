@@ -25,11 +25,17 @@ establish working hardware support.
 ## Current status and safety
 
 An arm64 kernel, Raven DTB and modules were compiled from the upstream source.
-No Omnipha image, device boot, USB networking or SSH access has been verified
-for the Pixel 6 Pro. Image composition and device packaging are separate from
-this kernel tree. Before any device boot or flash test, obtain explicit
-operator authorization and verify device identity, artifact checksums,
-partition/slot targets, backups and the device-specific recovery path.
+On 2026-11-24 a candidate built from this tree booted on a real Pixel 6 Pro
+(`raven`, slot `_a`): full Linux userspace, key-only SSH over USB-C networking
+(`18d1:d001`, CDC-NCM) and passwordless `sudo` were verified, and the boot is
+repeatable across a reboot. Evidence and artifact hashes are recorded in
+[`Documentation/gs101/raven-boot-failure-analysis.md`](Documentation/gs101/raven-boot-failure-analysis.md).
+The display currently shows no mainline panel output (`fb0` is the bootloader
+framebuffer via `simpledrm`); this remains open. Image composition and device
+packaging are separate from this kernel tree. Before any further device boot
+or flash test, obtain explicit operator authorization and verify device
+identity, artifact checksums, partition/slot targets, backups and the
+device-specific recovery path.
 
 Do not commit private keys, passwords, serial numbers, device dumps, proprietary
 firmware blobs or other private data. Follow the kernel licensing notices in

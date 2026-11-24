@@ -755,7 +755,11 @@ they contain device-specific data); the paths are listed in the handoff notes:
 | `ssh-cand4-final-20261124-103458.log` | final acceptance snapshot |
 | `known_hosts-cand4` | device host keys (fingerprints quoted above) |
 
+### Historical: the abandoned 2026-11-23 RAM-boot attempt (superseded)
 
+> Historical record only — this attempt preceded the successful flash of
+> 2026-11-24 described in [Device test result](#device-test-result). It is
+> kept for the USB-wedge findings, not as current state.
 
 The RAM-boot test was **not** completed. The sequence was:
 
