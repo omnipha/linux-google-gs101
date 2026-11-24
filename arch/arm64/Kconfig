@@ -2539,6 +2539,17 @@ config CMDLINE_FROM_BOOTLOADER
 	  the boot loader doesn't provide any, the default kernel command
 	  string provided in CMDLINE will be used.
 
+config CMDLINE_EXTEND
+	bool "Extend bootloader kernel arguments"
+	help
+	  The built-in kernel command string (CMDLINE) will be appended to
+	  the command line provided by the boot loader. Use this when the
+	  bootloader filters or rewrites specific kernel arguments (for
+	  example dropping console= tokens) and built-in defaults must
+	  survive. Note that for options parsed "last one wins", the
+	  boot loader's own arguments take precedence over the appended
+	  built-in ones.
+
 config CMDLINE_FORCE
 	bool "Always use the default kernel command string"
 	help
