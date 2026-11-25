@@ -1,0 +1,21 @@
+7.3.0-rc6-gs101
+I: Bus=001c Vendor=0000 Product=0000 Version=0000
+N: Name="sec_touchscreen"
+P: Phys=sec_touchscreen/input1
+S: Sysfs=/devices/platform/soc@0/10d400c0.usi/10d40000.spi/spi_master/spi0/spi0.0/input/input1
+U: Uniq=
+H: Handlers=kbd event1 
+B: PROP=2
+B: EV=2b
+B: KEY=420 0 0 100000000000 0 0
+sec_touch             602112  0
+sec_touch
+[11726.491844] sec_ts spi0.0: [sec_input] sec_ts_read_internal: retry 1 for 0x60 size(8) delay_us(100)
+[11726.493115] sec_ts spi0.0: [sec_input] sec_ts_read_event: event buffer is empty
+[11726.500313] sec_ts spi0.0: [sec_input] sec_ts_read_internal: retry 1 for 0x60 size(8) delay_us(100)
+[11726.501569] sec_ts spi0.0: [sec_input] sec_ts_read_event: event buffer is empty
+[11726.508605] sec_ts spi0.0: [sec_input] sec_ts_read_internal: retry 1 for 0x60 size(8) delay_us(100)
+[11726.509862] sec_ts spi0.0: [sec_input] sec_ts_read_event: event buffer is empty
+[11726.516994] sec_ts spi0.0: [sec_input] sec_ts_read_internal: retry 1 for 0x60 size(8) delay_us(100)
+[11726.518249] sec_ts spi0.0: [sec_input] sec_ts_read_event: event buffer is empty
+-rw-r--r--    1 root     root        218924 Nov 24 21:49 /lib/firmware/s6sy79x.bin
