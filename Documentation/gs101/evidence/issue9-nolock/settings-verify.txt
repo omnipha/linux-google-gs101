@@ -1,0 +1,13 @@
+=== Uptime ===
+ 12:08:08 up 5 min,  0 users,  load average: 0.83, 0.88, 0.46
+=== dconf read ===
+false
+uint32 0
+true
+false
+=== gsettings get ===
+false
+false
+uint32 0
+true
+false
