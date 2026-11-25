@@ -3689,6 +3689,8 @@ static int sec_ts_pinctrl_configure(struct sec_ts_data *ts, bool enable)
 static int sec_ts_check_for_deferred_regulators(struct device *dev)
 {
 	struct regulator *reg = regulator_get(dev, "vdd");
+	if (IS_ERR(reg))
+		reg = regulator_get(NULL, "dvdd_tsp");
 
 	if (reg == ERR_PTR(-EPROBE_DEFER))
 		return true;
@@ -3696,6 +3698,8 @@ static int sec_ts_check_for_deferred_regulators(struct device *dev)
 		regulator_put(reg);
 
 	reg = regulator_get(dev, "avdd");
+	if (IS_ERR(reg))
+		reg = regulator_get(NULL, "avdd_ts");
 	if (reg == ERR_PTR(-EPROBE_DEFER))
 		return true;
 	if (!IS_ERR_OR_NULL(reg))
@@ -3712,6 +3716,8 @@ static int sec_ts_power(void *data, bool on)
 
 	if (!pdata->regulator_vdd) {
 		pdata->regulator_vdd = regulator_get(&ts->client->dev, "vdd");
+		if (IS_ERR_OR_NULL(pdata->regulator_vdd))
+			pdata->regulator_vdd = regulator_get(NULL, "dvdd_tsp");
 		if (IS_ERR_OR_NULL(pdata->regulator_vdd)) {
 			pdata->regulator_vdd = NULL;
 			input_err(true, &ts->client->dev,
@@ -3722,6 +3728,8 @@ static int sec_ts_power(void *data, bool on)
 
 	if (!pdata->regulator_avdd) {
 		pdata->regulator_avdd = regulator_get(&ts->client->dev, "avdd");
+		if (IS_ERR_OR_NULL(pdata->regulator_avdd))
+			pdata->regulator_avdd = regulator_get(NULL, "avdd_ts");
 		if (IS_ERR_OR_NULL(pdata->regulator_avdd)) {
 			pdata->regulator_avdd = NULL;
 			input_err(true, &ts->client->dev,
@@ -3806,7 +3814,7 @@ static int sec_ts_parse_dt(struct spi_device *client)
 					index,
 					&panelmap);
 			if (ret)
-				return -EPROBE_DEFER;
+				break;
 			panel = of_drm_find_panel(panelmap.np);
 			of_node_put(panelmap.np);
 			if (!IS_ERR_OR_NULL(panel)) {

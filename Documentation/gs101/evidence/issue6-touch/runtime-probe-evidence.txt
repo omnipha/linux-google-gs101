@@ -1,0 +1,61 @@
+Runtime Evidence: sec_ts Driver Probe & Touchscreen Initialization on Raven (mb010)
+Date: 2026-11-25
+Kernel: Linux mb010 7.3.0-rc6-gs101 #10 SMP PREEMPT Tue Nov 24 21:33:01 CET 2026 aarch64
+Boot configuration: boot_a = cand12 (f67833f1...), vendor_boot_a = cand5 (97424a4d...)
+
+1. Hardware & SPI Pinmux Diagnosis:
+- ts-spi-sel (gpp26-1): out lo (AP master mode)
+- CS0 (gpp23-3): active low
+- Vendor overlay mapped gpp23-0..3 to "ts_spi_bus_active" / "ts_spi_cs_active", which mainline samsung-pinctrl rejected with "invalid function ts_spi_bus_active in map table".
+- Resolved by muxing gpp23-0..2 to "spi11-bus-pins" and gpp23-3 to "spi11-cs-pins".
+
+2. Driver Adjustments (drivers/input/touchscreen/sec_ts/sec_ts.c):
+- Avoid infinite probe deferral in sec_ts_parse_dt() when sec,panel_map points to a panel not exposed under simpledrm (break instead of return -EPROBE_DEFER).
+- Added fallback lookup to global PMIC regulators "dvdd_tsp" (LDO25M, 1.8V) and "avdd_ts" (LDO26M, 3.3V) if DT phandle lookup defers or fails.
+
+3. Chip Identification & Initialization:
+- Module: sec_touch.ko loaded via insmod
+- Device ID read: 53 45 37 92 00 ("SE792" / Samsung S6SY792/S6SY79x)
+- Firmware on device: /lib/firmware/s6sy79x.bin (218,924 bytes, sha256: 2bb04fcd83aea6dcfb78b9be08088001764e41081b852dea47fc2d9320a81dd3)
+- Firmware version info:
+    IC Image version: 28.31.1.19
+    IC Core version: 28.31.1.0
+    IC Config version: 28.31.1.4
+    Status: 0x20 (Normal operating mode)
+    Cal: 04 04 00 A2 28 31 01 04
+    ID: AC 37 92
+
+4. Input Subsystem Integration:
+- /proc/bus/input/devices:
+    I: Bus=001c Vendor=0000 Product=0000 Version=0000
+    N: Name="sec_touchscreen"
+    P: Phys=sec_touchscreen/input1
+    S: Sysfs=/devices/platform/soc@0/10d400c0.usi/10d40000.spi/spi_master/spi0/spi0.0/input/input1
+    U: Uniq=
+    H: Handlers=kbd event1
+    B: PROP=2
+    B: EV=2b
+    B: KEY=420 0 0 100000000000 0 0
+    B: ABS=6f3800001000003
+    B: SW=0
+
+5. Userspace Integration:
+- libinput list-devices output:
+    Device:           sec_touchscreen
+    Kernel:           /dev/input/event1
+    Group:            1
+    Seat:             seat0, default
+    Capabilities:     keyboard touch
+    Tap-to-click:     n/a
+    Tap-and-drag:     n/a
+    Tap drag lock:    n/a
+    Left-handed:      n/a
+    Nat.scrolling:    n/a
+    Middle emulation: n/a
+    Calibration:      identity matrix
+    Scroll methods:   none
+    Click methods:    none
+    Disable-w-typing: n/a
+    Disable-w-trackpointing: n/a
+    Accel profiles:   n/a
+    Rotation:         0.0
