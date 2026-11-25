@@ -2023,7 +2023,7 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 		return;
 	}
 
-	if (!p_event_coord->tid)
+	if (!p_event_coord->tid || p_event_coord->tid > MAX_SUPPORT_TOUCH_COUNT)
 		return;
 
 	t_id = (p_event_coord->tid - 1);
@@ -2035,6 +2035,10 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 					(p_event_coord->x_3_0);
 		ts->coord[t_id].y = (p_event_coord->y_11_4 << 4) |
 					(p_event_coord->y_3_0);
+		if (ts->plat_data->max_x && ts->coord[t_id].x >= ts->plat_data->max_x)
+			ts->coord[t_id].x = ts->plat_data->max_x - 1;
+		if (ts->plat_data->max_y && ts->coord[t_id].y >= ts->plat_data->max_y)
+			ts->coord[t_id].y = ts->plat_data->max_y - 1;
 		ts->coord[t_id].z = p_event_coord->z &
 					SEC_TS_PRESSURE_MAX;
 		ts->coord[t_id].ttype = p_event_coord->ttype_3_2 << 2 |
@@ -2044,15 +2048,20 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 		ts->coord[t_id].minor = p_event_coord->minor *
 						ts->plat_data->mm2px;
 
-		if (!ts->coord[t_id].palm &&
-			(ts->coord[t_id].ttype == SEC_TS_TOUCHTYPE_PALM))
-			ts->palm_count++;
-
 		ts->coord[t_id].palm =
 			(ts->coord[t_id].ttype == SEC_TS_TOUCHTYPE_PALM);
 
 		ts->coord[t_id].grip =
 			(ts->coord[t_id].ttype == SEC_TS_TOUCHTYPE_GRIP);
+
+		/* Bottom-edge / edge palm rejection: secondary contact near extreme bottom edge */
+		if (t_id > 0 && ts->plat_data->max_y &&
+		    ts->coord[t_id].y >= (ts->plat_data->max_y * 95 / 100)) {
+			ts->coord[t_id].palm = true;
+		}
+
+		if (ts->coord[t_id].palm || ts->coord[t_id].grip)
+			ts->palm_count++;
 
 		ts->coord[t_id].left_event = p_event_coord->left_event;
 
@@ -2088,7 +2097,7 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 				if (ts->longest_duration < ms_delta)
 					ts->longest_duration = ms_delta;
 
-				if (ts->touch_count > 0)
+				if (ts->touch_count > 0 && !ts->coord[t_id].palm)
 					ts->touch_count--;
 				if (ts->touch_count == 0 ||
 					ts->tid_touch_state == 0) {
@@ -2109,12 +2118,6 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 						ABS_MT_PRESSURE, 0);
 				input_mt_report_slot_state(ts->input_dev,
 					MT_TOOL_FINGER, 0);
-
-				if (ts->touch_count == 0 ||
-					ts->tid_touch_state == 0) {
-					input_report_key(ts->input_dev,
-						BTN_TOUCH, 0);
-				}
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_OFFLOAD)
 				}
 #endif
@@ -2122,7 +2125,8 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 					SEC_TS_COORDINATE_ACTION_PRESS) {
 				ts->coord[t_id].ktime_pressed = ktime_get();
 				ts->pressed_count++;
-				ts->touch_count++;
+				if (!ts->coord[t_id].palm)
+					ts->touch_count++;
 				if ((ts->touch_count > 4) &&
 					(ts->check_multi == 0)) {
 					ts->check_multi = 1;
@@ -2158,15 +2162,10 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 				if (ts->coord[t_id].palm)
 					input_mt_report_slot_state(
 						ts->input_dev, MT_TOOL_PALM, 1);
-				else if (ts->coord[t_id].grip)
-					input_mt_report_slot_state(
-						ts->input_dev, MT_TOOL_PALM, 1);
 				else
 					input_mt_report_slot_state(
 						ts->input_dev,
 						MT_TOOL_FINGER, 1);
-
-				input_report_key(ts->input_dev, BTN_TOUCH, 1);
 
 				input_report_abs(ts->input_dev,
 					ABS_MT_POSITION_X, ts->coord[t_id].x);
@@ -2243,15 +2242,10 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 				if (ts->coord[t_id].palm)
 					input_mt_report_slot_state(
 						ts->input_dev, MT_TOOL_PALM, 1);
-				else if (ts->coord[t_id].grip)
-					input_mt_report_slot_state(
-						ts->input_dev, MT_TOOL_PALM, 1);
 				else
 					input_mt_report_slot_state(
 						ts->input_dev,
 						MT_TOOL_FINGER, 1);
-
-				input_report_key(ts->input_dev, BTN_TOUCH, 1);
 
 				input_report_abs(ts->input_dev,
 					ABS_MT_POSITION_X, ts->coord[t_id].x);
@@ -4343,8 +4337,8 @@ static void sec_ts_set_input_prop(struct sec_ts_data *ts,
 	input_set_abs_params(dev, ABS_MT_TOUCH_MINOR, 0,
 			255 * ts->plat_data->mm2px,
 			0, 0);
-	input_set_abs_params(dev, ABS_MT_TOOL_TYPE, MT_TOOL_FINGER,
-			     MT_TOOL_FINGER, 0, 0);
+	input_set_abs_params(dev, ABS_MT_TOOL_TYPE, 0,
+			     MT_TOOL_PALM, 0, 0);
 #ifdef ABS_MT_CUSTOM
 	input_set_abs_params(dev, ABS_MT_CUSTOM, 0, 0xFFFF, 0, 0);
 #endif
@@ -4566,6 +4560,8 @@ static int sec_ts_heatmap_init(struct sec_ts_data *ts)
 #ifdef USE_CHARGER_WORK
 static struct notifier_block sec_ts_psy_nb;
 #endif
+
+static int sec_ts_init_touch_mode(struct sec_ts_data *ts);
 
 #ifdef I2C_INTERFACE
 static int sec_ts_probe(struct i2c_client *client,
@@ -4940,6 +4936,9 @@ static int sec_ts_probe(struct spi_device *client)
 	if (ts->is_fw_corrupted == false)
 		sec_ts_device_init(ts);
 
+	if (ts->is_fw_corrupted == false)
+		sec_ts_init_touch_mode(ts);
+
 #ifdef SEC_TS_FW_UPDATE_ON_PROBE
 	schedule_work(&ts->fw_update_work);
 
@@ -5164,16 +5163,59 @@ static void sec_ts_reset_work(struct work_struct *work)
 }
 #endif
 
+static int sec_ts_init_touch_mode(struct sec_ts_data *ts)
+{
+	int ret;
+	u8 power_mode = TO_TOUCH_MODE;
+	u8 state_manage_on = STATE_MANAGE_ON;
+
+	input_info(true, &ts->client->dev, "%s: initializing touch mode explicitly\n", __func__);
+
+	/* 1. Set normal operational touch power mode (TO_TOUCH_MODE = 0) */
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SET_POWER_MODE, &power_mode, 1);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to set power mode: %d\n", __func__, ret);
+	sec_ts_delay(50);
+
+	/* 2. Release test/idle state management mode (STATE_MANAGE_ON = 1) */
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_STATEMANAGE_ON, &state_manage_on, 1);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to set statemanage on: %d\n", __func__, ret);
+	sec_ts_delay(20);
+
+	/* 3. Configure touch functions */
+	ts->touch_functions |= SEC_TS_DEFAULT_ENABLE_BIT_SETFUNC;
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SET_TOUCHFUNCTION,
+			       (u8 *)&ts->touch_functions, 2);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to set touch functions: %d\n", __func__, ret);
+	sec_ts_delay(20);
+
+	/* 4. Configure grip/edge rejection */
+	sec_ts_set_grip_type(ts, ONLY_EDGE_HANDLER);
+
+	/* 5. Command SENSE_ON */
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SENSE_ON, NULL, 0);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to write Sense_on: %d\n", __func__, ret);
+	sec_ts_delay(20);
+
+	/* 6. Clear event buffer stack and initialize coordinate tracking state */
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_CLEAR_EVENT_STACK, NULL, 0);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to clear event stack: %d\n", __func__, ret);
+
+	sec_ts_locked_release_all_finger(ts);
+
+	return 0;
+}
+
 void sec_ts_read_init_info(struct sec_ts_data *ts)
 {
-#ifndef CONFIG_SEC_FACTORY
-	struct sec_ts_test_mode mode;
-	char para = TO_TOUCH_MODE;
-#endif
 #ifdef USE_PRESSURE_SENSOR
 	unsigned char data[18] = { 0 };
-#endif
 	int ret;
+#endif
 
 	ts->nv = get_tsp_nvm_data(ts, SEC_TS_NVM_OFFSET_FAC_RESULT);
 	ts->cal_count = get_tsp_nvm_data(ts, SEC_TS_NVM_OFFSET_CAL_COUNT);
@@ -5208,32 +5250,8 @@ void sec_ts_read_init_info(struct sec_ts_data *ts)
 		ts->pressure_left, ts->pressure_center, ts->pressure_right);
 #endif
 
-#if 0 /* Selftest is for factory calibration; running it on normal probe causes 4s timeout & test-mode state */
-	/* run self-test */
-	disable_irq(ts->client->irq);
-	execute_selftest(ts,
-		TEST_OPEN | TEST_NODE_VARIANCE |
-		TEST_SHORT | TEST_SELF_NODE | TEST_NOT_SAVE);
-	enable_irq(ts->client->irq);
-
-	input_info(true, &ts->client->dev, "%s: %02X %02X %02X %02X\n",
-		__func__, ts->ito_test[0], ts->ito_test[1]
-		, ts->ito_test[2], ts->ito_test[3]);
-
-	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SET_POWER_MODE, &para, 1);
-	if (ret < 0)
-		input_err(true, &ts->client->dev, "%s: Failed to set\n",
-				__func__);
-
-	sec_ts_delay(350);
-
-	/* run ambient read */
-	memset(&mode, 0x00, sizeof(struct sec_ts_test_mode));
-	mode.type = TYPE_AMBIENT_DATA;
-	mode.allnode = TEST_MODE_ALL_NODE;
-
-	sec_ts_read_raw_data(ts, NULL, &mode);
-#endif
+	/* Explicit touch sensing initialization without selftest side effects */
+	sec_ts_init_touch_mode(ts);
 
 	input_log_fix();
 }
