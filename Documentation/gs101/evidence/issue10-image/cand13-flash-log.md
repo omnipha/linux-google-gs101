@@ -35,3 +35,12 @@
 
 ## 4. Root Cause Analysis
 Building `sec_touch` directly built-in into `vmlinux` (`CONFIG_TOUCHSCREEN_SEC_TS=y`) causes the SPI driver probe to execute early in kernel boot before the Exynos PMIC regulators (`dvdd_tsp`, `avdd_ts`) or SPI peripheral clock domains are completely settled, hanging the kernel prior to USB gadget / CDC-NCM initialization. In contrast, loading `sec_touch` as a module (`=m`) from initramfs or userspace executes after regulator and bus initialization, allowing stable bring-up.
+
+## 5. Rollback Execution & Verification
+- At `2026-11-25 13:06 CET`, fastboot mode was entered and the automated rollback script flashed baseline partitions:
+  - `fastboot flash boot_a /tmp/opencode/gs101/cand12/boot.img` (14340 KB -> OKAY)
+  - `fastboot flash vendor_boot_a /tmp/opencode/gs101/cand5/vendor_boot.img` (25804 KB -> OKAY)
+  - `fastboot reboot`
+- Device returned online via SSH at `172.16.42.1` within ~80 seconds:
+  - Kernel: `Linux mb010 7.3.0-rc6-gs101 #10 SMP PREEMPT Tue Nov 24 21:33:01 CET 2026 aarch64`
+  - Userspace: Phoc, Phosh, and Squeekboard verified running and responsive.
