@@ -38,7 +38,7 @@ start_monitor() {
         --description="IRQ97 sampler /proc/interrupts (issue 6)" \
         /bin/sh -c "
             while true; do
-                line=\$(grep -E '^ *97:' /proc/interrupts | head -1)
+                line=\$(grep -E 'sec_ts' /proc/interrupts | head -1)
                 printf '%s %s\n' \"\$(date '+%Y-%m-%d %H:%M:%S')\" \"\$line\" >> $IRQ_LOG
                 sleep 5
             done

@@ -986,7 +986,8 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	status = "okay";
-	pinctrl-0 = <>;
+	pinctrl-0 = <&spi11_bus &spi11_cs>;
+	pinctrl-names = "default";
 	cs-gpios = <&gpp23 3 GPIO_ACTIVE_LOW>;
 	num-cs = <1>;
 	spitouch: touchscreen@0 {

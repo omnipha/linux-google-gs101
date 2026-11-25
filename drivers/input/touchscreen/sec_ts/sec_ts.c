@@ -13,6 +13,7 @@
 struct sec_ts_data *tsp_info;
 
 #include "sec_ts.h"
+#include <linux/of.h>
 #include <linux/pinctrl/consumer.h>
 #include <linux/string.h>
 
@@ -3655,6 +3656,8 @@ void sec_ts_set_grip_type(struct sec_ts_data *ts, u8 set_type)
 
 /* for debugging--------------------------------------------------------------*/
 
+#define GS101_GPP23_CON_PHYS 0x10c40060
+
 static int sec_ts_pinctrl_configure(struct sec_ts_data *ts, bool enable)
 {
 	struct pinctrl_state *state;
@@ -3663,8 +3666,27 @@ static int sec_ts_pinctrl_configure(struct sec_ts_data *ts, bool enable)
 		   __func__, enable ? "ACTIVE" : "SUSPEND");
 
 	if (enable) {
+		if (of_machine_is_compatible("google,gs101")) {
+			void __iomem *gpp23_con = ioremap(GS101_GPP23_CON_PHYS, 4);
+			if (gpp23_con) {
+				u32 val = readl(gpp23_con);
+				if ((val & 0x0fff) != 0x0222) {
+					val &= ~0x0fff;
+					val |= 0x0222;
+					writel(val, gpp23_con);
+					input_info(true, &ts->client->dev,
+						   "%s: configured gpp23 CON to 0x%08x\n",
+						   __func__, val);
+				}
+				iounmap(gpp23_con);
+			}
+		}
+
 		state = pinctrl_lookup_state(ts->plat_data->pinctrl,
 					     "on_state");
+		if (IS_ERR_OR_NULL(state))
+			state = pinctrl_lookup_state(ts->plat_data->pinctrl,
+						     PINCTRL_STATE_DEFAULT);
 		if (IS_ERR(ts->plat_data->pinctrl))
 			input_err(true, &ts->client->dev,
 				"%s: could not get active pinstate\n",
@@ -3672,6 +3694,9 @@ static int sec_ts_pinctrl_configure(struct sec_ts_data *ts, bool enable)
 	} else {
 		state = pinctrl_lookup_state(ts->plat_data->pinctrl,
 					     "off_state");
+		if (IS_ERR_OR_NULL(state))
+			state = pinctrl_lookup_state(ts->plat_data->pinctrl,
+						     PINCTRL_STATE_SLEEP);
 		if (IS_ERR(ts->plat_data->pinctrl))
 			input_err(true, &ts->client->dev,
 				"%s: could not get suspend pinstate\n",
@@ -3682,7 +3707,6 @@ static int sec_ts_pinctrl_configure(struct sec_ts_data *ts, bool enable)
 		return pinctrl_select_state(ts->plat_data->pinctrl, state);
 
 	return 0;
-
 }
 
 /* Return true if you should defer sec_ts probe waiting for
