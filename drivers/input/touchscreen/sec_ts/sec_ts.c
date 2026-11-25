@@ -2103,8 +2103,6 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 					ts->tid_touch_state == 0) {
 					input_report_key(ts->input_dev,
 						BTN_TOUCH, 0);
-					input_report_key(ts->input_dev,
-						BTN_TOOL_FINGER, 0);
 				}
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_OFFLOAD)
 				}
@@ -2158,8 +2156,6 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 						MT_TOOL_FINGER, 1);
 
 				input_report_key(ts->input_dev, BTN_TOUCH, 1);
-				input_report_key(ts->input_dev,
-							BTN_TOOL_FINGER, 1);
 
 				input_report_abs(ts->input_dev,
 					ABS_MT_POSITION_X, ts->coord[t_id].x);
@@ -2245,8 +2241,6 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 						MT_TOOL_FINGER, 1);
 
 				input_report_key(ts->input_dev, BTN_TOUCH, 1);
-				input_report_key(ts->input_dev,
-							BTN_TOOL_FINGER, 1);
 
 				input_report_abs(ts->input_dev,
 					ABS_MT_POSITION_X, ts->coord[t_id].x);
@@ -3159,14 +3153,21 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 	}
 
 	if (left_event_count > 0) {
-		ret = sec_ts_read(ts, SEC_TS_READ_ALL_EVENT,
-			(u8 *)read_event_buff[1],
-			sizeof(u8) * (SEC_TS_EVENT_BUFF_SIZE) *
-				(left_event_count));
-		if (ret < 0) {
-			input_err(true, &ts->client->dev,
-				  "%s: read one event failed\n", __func__);
-			return;
+		int events_read = 0;
+
+		while (events_read < left_event_count) {
+			int chunk = min_t(int, left_event_count - events_read, 6);
+
+			ret = sec_ts_read(ts, SEC_TS_READ_ALL_EVENT,
+				(u8 *)read_event_buff[1 + events_read],
+				sizeof(u8) * (SEC_TS_EVENT_BUFF_SIZE) * chunk);
+			if (ret < 0) {
+				input_err(true, &ts->client->dev,
+					  "%s: read events failed at chunk %d\n",
+					  __func__, events_read);
+				return;
+			}
+			events_read += chunk;
 		}
 	}
 
@@ -3309,6 +3310,7 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 	if (!ts->offload.offload_running) {
 #endif
 	mutex_lock(&ts->eventlock);
+	input_mt_report_pointer_emulation(ts->input_dev, true);
 	input_set_timestamp(ts->input_dev, ts->timestamp);
 	input_sync(ts->input_dev);
 	mutex_unlock(&ts->eventlock);
@@ -4258,6 +4260,10 @@ static void sec_ts_set_input_prop(struct sec_ts_data *ts,
 	set_bit(EV_SW, dev->evbit);
 	set_bit(BTN_TOUCH, dev->keybit);
 	set_bit(BTN_TOOL_FINGER, dev->keybit);
+	set_bit(BTN_TOOL_DOUBLETAP, dev->keybit);
+	set_bit(BTN_TOOL_TRIPLETAP, dev->keybit);
+	set_bit(BTN_TOOL_QUADTAP, dev->keybit);
+	set_bit(BTN_TOOL_QUINTTAP, dev->keybit);
 #ifdef SEC_TS_SUPPORT_CUSTOMLIB
 	set_bit(KEY_BLACK_UI_GESTURE, dev->keybit);
 #endif
@@ -5062,7 +5068,6 @@ void sec_ts_unlocked_release_all_finger(struct sec_ts_data *ts)
 	input_mt_slot(ts->input_dev, 0);
 
 	input_report_key(ts->input_dev, BTN_TOUCH, false);
-	input_report_key(ts->input_dev, BTN_TOOL_FINGER, false);
 #ifdef SW_GLOVE
 	input_report_switch(ts->input_dev, SW_GLOVE, false);
 #endif
@@ -5083,6 +5088,7 @@ void sec_ts_unlocked_release_all_finger(struct sec_ts_data *ts)
 	}
 #endif
 	input_report_key(ts->input_dev, KEY_HOMEPAGE, 0);
+	input_mt_report_pointer_emulation(ts->input_dev, true);
 	input_sync(ts->input_dev);
 }
 
