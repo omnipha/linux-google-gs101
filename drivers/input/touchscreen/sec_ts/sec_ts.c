@@ -74,8 +74,11 @@ u32 sec_ts_spi_delay(u8 reg, u32 data_len)
 	case SEC_TS_CMD_CUSTOMLIB_READ_PARAM:
 		delay_us = min(120 + (data_len >> 2), (u32) 500);
 		break;
+	case SEC_TS_READ_ONE_EVENT:
+		delay_us = 600;
+		break;
 	case SEC_TS_READ_ALL_EVENT:
-		delay_us = 550;
+		delay_us = 650;
 		break;
 	case SEC_TS_READ_CSRAM_RTDP_DATA:
 		delay_us = 550;
@@ -450,10 +453,14 @@ static int sec_ts_read_internal(struct sec_ts_data *ts, u8 reg,
 						"%s: wake-up touch(#%d) by 0x%02X cmd delay_us(%d)\n",
 						__func__, retry + 1, reg, spi_delay_us);
 				} else {
-					input_err(true, &ts->client->dev,
+					input_dbg(true, &ts->client->dev,
 						"%s: retry %d for 0x%02X size(%d) delay_us(%d)\n",
 						__func__, retry + 1, reg, len, spi_delay_us);
-						ts->comm_err_count++;
+					if (retry == SEC_TS_IO_RETRY_CNT - 1)
+						input_err(true, &ts->client->dev,
+							"%s: final retry failed for 0x%02X size(%d)\n",
+							__func__, reg, len);
+					ts->comm_err_count++;
 				}
 
 				usleep_range(1 * 1000, 1 * 1000);
@@ -2016,6 +2023,9 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 		return;
 	}
 
+	if (!p_event_coord->tid)
+		return;
+
 	t_id = (p_event_coord->tid - 1);
 
 	if (t_id < MAX_SUPPORT_TOUCH_COUNT + MAX_SUPPORT_HOVER_COUNT) {
@@ -3111,6 +3121,8 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 	}
 
 	ret = event_id = curr_pos = remain_event_count = 0;
+	if (!ts->timestamp)
+		ts->timestamp = ktime_get();
 	/* repeat READ_ONE_EVENT until buffer is empty(No event) */
 	ret = sec_ts_read(ts, SEC_TS_READ_ONE_EVENT,
 			  (u8 *)read_event_buff[0], SEC_TS_EVENT_BUFF_SIZE);
@@ -3129,7 +3141,7 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 			read_event_buff[0][6], read_event_buff[0][7]);
 
 	if (read_event_buff[0][0] == 0) {
-		input_info(true, &ts->client->dev,
+		input_dbg(false, &ts->client->dev,
 			"%s: event buffer is empty\n", __func__);
 		return;
 	}
@@ -3174,6 +3186,11 @@ static void sec_ts_read_event(struct sec_ts_data *ts)
 
 	do {
 		event_buff = read_event_buff[curr_pos];
+		if (event_buff[0] == 0 || (event_buff[0] & 0x3) == SEC_TS_EMPTY_EVENT) {
+			curr_pos++;
+			remain_event_count--;
+			continue;
+		}
 		event_id = event_buff[0] & 0x3;
 
 		if (ts->debug_events && curr_pos > 0)
@@ -5191,7 +5208,7 @@ void sec_ts_read_init_info(struct sec_ts_data *ts)
 		ts->pressure_left, ts->pressure_center, ts->pressure_right);
 #endif
 
-#ifndef CONFIG_SEC_FACTORY
+#if 0 /* Selftest is for factory calibration; running it on normal probe causes 4s timeout & test-mode state */
 	/* run self-test */
 	disable_irq(ts->client->irq);
 	execute_selftest(ts,

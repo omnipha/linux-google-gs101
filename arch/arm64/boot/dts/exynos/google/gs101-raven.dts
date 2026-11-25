@@ -139,6 +139,8 @@
 
 		sec,firmware_name = "s6sy79x.bin";
 		sec,max_coords = <1440 3120>;
+		sec,mm2px = [14];
+		sec,mis_cal_check = <1>;
 
 		vdd-supply = <&s2mpg10_ldo25m>;
 		avdd-supply = <&s2mpg10_ldo26m>;
