@@ -2054,12 +2054,6 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 		ts->coord[t_id].grip =
 			(ts->coord[t_id].ttype == SEC_TS_TOUCHTYPE_GRIP);
 
-		/* Bottom-edge / edge palm rejection: secondary contact near extreme bottom edge */
-		if (t_id > 0 && ts->plat_data->max_y &&
-		    ts->coord[t_id].y >= (ts->plat_data->max_y * 95 / 100)) {
-			ts->coord[t_id].palm = true;
-		}
-
 		if (ts->coord[t_id].palm || ts->coord[t_id].grip)
 			ts->palm_count++;
 
@@ -2097,7 +2091,7 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 				if (ts->longest_duration < ms_delta)
 					ts->longest_duration = ms_delta;
 
-				if (ts->touch_count > 0 && !ts->coord[t_id].palm)
+				if (ts->touch_count > 0)
 					ts->touch_count--;
 				if (ts->touch_count == 0 ||
 					ts->tid_touch_state == 0) {
@@ -2125,8 +2119,7 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 					SEC_TS_COORDINATE_ACTION_PRESS) {
 				ts->coord[t_id].ktime_pressed = ktime_get();
 				ts->pressed_count++;
-				if (!ts->coord[t_id].palm)
-					ts->touch_count++;
+				ts->touch_count++;
 				if ((ts->touch_count > 4) &&
 					(ts->check_multi == 0)) {
 					ts->check_multi = 1;
@@ -4124,8 +4117,8 @@ static int sec_ts_parse_dt(struct spi_device *client)
 			   offload_id[3], pdata->offload_id);
 	}
 
-	if (of_property_read_u8(np, "sec,mm2px", &pdata->mm2px) < 0)
-		pdata->mm2px = 1;
+	if (of_property_read_u8(np, "sec,mm2px", &pdata->mm2px) < 0 || pdata->mm2px <= 1)
+		pdata->mm2px = 20;
 	input_info(true, &client->dev,
 		   "%s: mm2px %d\n", __func__, pdata->mm2px);
 
@@ -4331,12 +4324,18 @@ static void sec_ts_set_input_prop(struct sec_ts_data *ts,
 			     0, 0);
 	input_set_abs_params(dev, ABS_MT_POSITION_Y, 0, ts->plat_data->max_y,
 			     0, 0);
+	input_abs_set_res(dev, ABS_MT_POSITION_X, ts->plat_data->mm2px);
+	input_abs_set_res(dev, ABS_MT_POSITION_Y, ts->plat_data->mm2px);
+	input_abs_set_res(dev, ABS_X, ts->plat_data->mm2px);
+	input_abs_set_res(dev, ABS_Y, ts->plat_data->mm2px);
 	input_set_abs_params(dev, ABS_MT_TOUCH_MAJOR, 0,
 			255 * ts->plat_data->mm2px,
 			0, 0);
 	input_set_abs_params(dev, ABS_MT_TOUCH_MINOR, 0,
 			255 * ts->plat_data->mm2px,
 			0, 0);
+	input_abs_set_res(dev, ABS_MT_TOUCH_MAJOR, ts->plat_data->mm2px);
+	input_abs_set_res(dev, ABS_MT_TOUCH_MINOR, ts->plat_data->mm2px);
 	input_set_abs_params(dev, ABS_MT_TOOL_TYPE, 0,
 			     MT_TOOL_PALM, 0, 0);
 #ifdef ABS_MT_CUSTOM
@@ -4743,6 +4742,7 @@ static int sec_ts_probe(struct spi_device *client)
 	}
 
 	ts->touch_count = 0;
+	ts->timestamp = ktime_get();
 	ts->tid_palm_state = 0;
 	ts->tid_grip_state = 0;
 	ts->tid_touch_state = 0;
@@ -5129,6 +5129,8 @@ void sec_ts_unlocked_release_all_finger(struct sec_ts_data *ts)
 #endif
 	input_report_key(ts->input_dev, KEY_HOMEPAGE, 0);
 	input_mt_report_pointer_emulation(ts->input_dev, true);
+	ts->timestamp = ktime_get();
+	input_set_timestamp(ts->input_dev, ts->timestamp);
 	input_sync(ts->input_dev);
 }
 

@@ -1,0 +1,135 @@
+=== SYSTEM ===
+Linux mb010 7.3.0-rc6-gs101 #14 SMP PREEMPT Wed Nov 25 14:23:01 CET 2026 aarch64 Linux
+ 19:16:08 up 0 min,  0 users,  load average: 0.26, 0.07, 0.02
+=== DMESG ===
+[    3.708609] sec_touch: loading out-of-tree module taints kernel.
+[    3.727612] sec_ts spi0.0: [sec_input] sec_ts_probe
+[    3.732622] sec_ts spi0.0: feedback delay set to default (0)
+[    3.739061] sec_ts spi0.0: [sec_input] sec_ts_probe: SPI interface(10000000 Hz)
+[    3.739144] sec_ts spi0.0: [sec_input] sec_ts_parse_dt: sec,fod_coords not found!
+[    3.753434] sec_ts spi0.0: [sec_input] sec_ts_parse_dt: unavailable switch_gpio!
+[    3.753544] sec_ts spi0.0: [sec_input] sec_ts_parse_dt: lcdtype 0x00000000
+[    3.753550] sec_ts spi0.0: [sec_input] : Failed to read sec,touch_offload_id
+[    3.753552] sec_ts spi0.0: [sec_input] sec_ts_parse_dt: mm2px 20
+[    3.753554] sec_ts spi0.0: [sec_input] sec_ts_parse_dt: io_burstmax: 1024, bringup: 0, FW: s6sy79x.bin, mis_cal_check: 0
+[    3.764685] sec_ts spi0.0: [sec_input] sec_ts_probe: fw update on probe disabled!
+[    3.787785] sec_ts spi0.0: [sec_input] sec_ts_pinctrl_configure: ACTIVE
+[    3.794926] sec_ts spi0.0: [sec_input] sec_ts_power: enable vdd
+[    3.803704] sec_ts spi0.0: [sec_input] sec_ts_power: enable avdd
+[    3.919220] sec_ts spi0.0: [sec_input] sec_ts_wait_for_ready_with_count: 09, 00, 10, 00, 00, 00, 00, 00 [0]
+[    3.931284] sec_ts spi0.0: [sec_input] sec_ts_probe: power enable
+[    3.932696] sec_ts spi0.0: [sec_input] sec_ts_fw_init: DEVICE ID: 53, 45, 37, 92, 00
+[    3.980042] sec_ts spi0.0: [sec_input] sec_ts_fw_init: TOUCH STATUS: 20 || 00, 03, 01, 00
+[    3.987710] sec_ts spi0.0: [sec_input] sec_ts_read_information: AC, 37, 92
+[    3.989234] sec_ts spi0.0: [sec_input] sec_ts_read_information: nTX: 18, nRX: 39, rY: 3120, rX: 1440
+[    3.990718] sec_ts spi0.0: [sec_input] sec_ts_read_information: BOOT_STATUS: 20
+[    3.992147] sec_ts spi0.0: [sec_input] sec_ts_read_information: TS_STATUS: 00, 03, 01, 00
+[    4.008407] sec_ts spi0.0: [sec_input] sec_ts_read_information: Functions: 61
+[    4.008595] input: sec_touchscreen as /devices/platform/soc@0/10d400c0.usi/10d40000.spi/spi_master/spi0/spi0.0/input/input1
+[    4.008703] sec_ts spi0.0: [sec_input] sec_ts_probe: request_irq = 136
+[    4.008991] sec_ts spi0.0: [sec_input] sec_ts_init_touch_mode: initializing touch mode explicitly
+[    4.114421] sec_ts spi0.0: [sec_input] sec_ts_set_grip_type: re-init grip(0), edh: 0, edg: 0, lan: 0
+[    4.174666] sec_ts spi0.0: [sec_input] sec_ts_probe: done
+[    5.186362] sec_ts spi0.0: [sec_input] sec_ts_fw_update_work: Beginning firmware update after probe.
+[    5.202583] sec_ts spi0.0: [sec_input] sec_ts_read_calibration_report: count: 5, pass cnt: 5, fail cnt: 0, status: A2, param ver: 28 31 1 4
+=== LIBINPUT ===
+Device:                  gpio-keys
+Kernel:                  /dev/input/event0
+Id:                      host:0001:0001
+Group:                   1
+Seat:                    seat0, default
+Capabilities:            keyboard 
+Tap-to-click:            n/a
+Tap-and-drag:            n/a
+Tap button map:          n/a
+Tap drag lock:           n/a
+Left-handed:             n/a
+Nat.scrolling:           n/a
+Middle emulation:        n/a
+Calibration:             n/a
+Scroll methods:          none
+Scroll button:           n/a
+Scroll button lock:      n/a
+Click methods:           none
+Clickfinger button map:  n/a
+Disable-w-typing:        n/a
+Disable-w-trackpointing: n/a
+Accel profiles:          n/a
+Rotation:                0.0
+Area rectangle:          n/a
+
+Device:                  sec_touchscreen
+Kernel:                  /dev/input/event1
+Id:                      <unknown>:0000:0000
+Group:                   2
+Seat:                    seat0, default
+Size:                    72x156mm
+Capabilities:            keyboard touch 
+Tap-to-click:            n/a
+Tap-and-drag:            n/a
+Tap button map:          n/a
+Tap drag lock:           n/a
+Left-handed:             n/a
+Nat.scrolling:           n/a
+Middle emulation:        n/a
+Calibration:             identity matrix
+Scroll methods:          none
+Scroll button:           n/a
+Scroll button lock:      n/a
+Click methods:           none
+Clickfinger button map:  n/a
+Disable-w-typing:        n/a
+Disable-w-trackpointing: n/a
+Accel profiles:          n/a
+Rotation:                0.0
+Area rectangle:          n/a
+
+=== EVDEV AXES ===
+ABS_MT_POSITION_X   : min=0 max=1439 res=20 (phys=72.0mm)
+ABS_MT_POSITION_Y   : min=0 max=3119 res=20 (phys=155.9mm)
+ABS_X               : min=0 max=1439 res=20 (phys=72.0mm)
+ABS_Y               : min=0 max=3119 res=20 (phys=155.9mm)
+ABS_MT_TOUCH_MAJOR  : min=0 max=5100 res=20 (phys=255.0mm)
+ABS_MT_TOUCH_MINOR  : min=0 max=5100 res=20 (phys=255.0mm)
+=== INTERRUPTS ===
+ 136:         11          0          0          0          0          0          0          0  gpa9             0 Level     sec_ts
+=== TOUCHMON SERVICE ===
+● touchmon.service - Persistent Touch Event Monitor
+     Loaded: loaded (/etc/systemd/system/touchmon.service; enabled; preset: disabled)
+     Active: active (running) since Wed 2026-11-25 19:15:35 CET; 33s ago
+ Invocation: 34aa83f8e46f4a3cb6daa32ce1779e15
+   Main PID: 3573 (python3)
+      Tasks: 2 (limit: 14358)
+     Memory: 13.1M (peak: 14.9M)
+        CPU: 158ms
+     CGroup: /system.slice/touchmon.service
+             ├─3573 /usr/bin/python3 /usr/local/bin/touchmon-recorder.py
+             └─3605 libinput-debug-events --show-keycodes --device /dev/input/event1
+
+Nov 25 19:15:35 mb010 systemd[1]: Started Persistent Touch Event Monitor.
+=== TOUCHMON LOG SAMPLE ===
+ event1   TOUCH_FRAME                  +0.122s	
+ event1   TOUCH_DOWN                   +0.130s	1 (1) 70.07/34.29 (1009.00/1070.00mm)
+ event1   TOUCH_FRAME                  +0.130s	
+ event1   TOUCH_MOTION                 +0.139s	1 (1) 70.42/35.42 (1014.00/1105.00mm)
+ event1   TOUCH_FRAME                  +0.139s	
+ event1   TOUCH_MOTION              2  +0.147s	1 (1) 70.83/36.44 (1020.00/1137.00mm)
+ event1   TOUCH_FRAME                  +0.147s	
+ event1   TOUCH_MOTION              2  +0.155s	1 (1) 71.53/36.96 (1030.00/1153.00mm)
+ event1   TOUCH_FRAME                  +0.155s	
+ event1   TOUCH_MOTION              2  +0.164s	1 (1) 72.01/37.05 (1037.00/1156.00mm)
+ event1   TOUCH_FRAME                  +0.164s	
+ event1   TOUCH_MOTION              2  +0.172s	1 (1) 72.36/37.12 (1042.00/1158.00mm)
+ event1   TOUCH_FRAME                  +0.172s	
+ event1   TOUCH_MOTION              2  +0.180s	1 (1) 72.71/37.15 (1047.00/1159.00mm)
+ event1   TOUCH_FRAME                  +0.180s	
+ event1   TOUCH_MOTION              2  +0.189s	1 (1) 73.06/37.31 (1052.00/1164.00mm)
+ event1   TOUCH_FRAME                  +0.189s	
+ event1   TOUCH_UP                     +0.197s	0 (0)
+ event1   TOUCH_FRAME                  +0.197s	
+-event1   DEVICE_ADDED                 sec_touchscreen                   seat0 default group1  cap:kt  size 72x156mm ntouches 10 calib
+-event1   DEVICE_ADDED                 sec_touchscreen                   seat0 default group1  cap:kt  size 72x156mm ntouches 10 calib
+-event1   DEVICE_ADDED                 sec_touchscreen                   seat0 default group1  cap:kt  size 72x156mm ntouches 10 calib
+-event1   DEVICE_ADDED                 sec_touchscreen                   seat0 default group1  cap:kt  size 72x156mm ntouches 10 calib
+-event1   DEVICE_ADDED                 sec_touchscreen                   seat0 default group1  cap:kt  size 72x156mm ntouches 10 calib
+-event1   DEVICE_ADDED                 sec_touchscreen                   seat0 default group1  cap:kt  size 72x156mm ntouches 10 calib

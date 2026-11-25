@@ -1,0 +1,5 @@
+84323d06a8df3b2cdcc9e05ccba802951e123d4cf2bc28ba781358f69020de36  /tmp/opencode/gs101/cand17/boot.img
+82ae6a8a0016ec82f9420f17e8409588ffc11064fd1d6d2da2bdd9d999e948db  /tmp/opencode/gs101/cand17/raven-region.dtb
+9b8f0b55fe7eb0aae35f62b80793319631b30a2fd00ee5103cc94067f418d7ef  /tmp/opencode/gs101/cand17/vendor_boot.img
+f28e36e1fc59668d98a51b5207506ea546734e1a595912b657bb4dff73fe17dc  /tmp/opencode/gs101/cand17/vendor_ramdisk00
+8ae74c0f2a7b579f931691a51badf9b24cbeaad421d17d972433142aba2059ae  drivers/input/touchscreen/sec_ts/sec_touch.ko
