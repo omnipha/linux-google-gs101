@@ -255,11 +255,13 @@ static void set_palm_detection_enable(void *device_data)
 	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, true);
 	sec_cmd_set_default_result(sec);
 
-	if (sec->cmd_param[0] == 1)
+	if (sec->cmd_param[0] == 1) {
 		para = 0x1;
-	else if (sec->cmd_param[0] == 0)
+		ts->fw_palm_enabled = true;
+	} else if (sec->cmd_param[0] == 0) {
 		para = 0x0;
-	else {
+		ts->fw_palm_enabled = false;
+	} else {
 		input_info(true, &ts->client->dev,
 			"%s: param error! param = %d\n",
 			__func__, sec->cmd_param[0]);
@@ -301,11 +303,13 @@ static void set_grip_detection_enable(void *device_data)
 	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, true);
 	sec_cmd_set_default_result(sec);
 
-	if (sec->cmd_param[0] == 1)
+	if (sec->cmd_param[0] == 1) {
 		para = 0x1F;
-	else if (sec->cmd_param[0] == 0)
+		ts->fw_grip_enabled = true;
+	} else if (sec->cmd_param[0] == 0) {
 		para = 0x0;
-	else {
+		ts->fw_grip_enabled = false;
+	} else {
 		input_info(true, &ts->client->dev,
 			"%s: param error! param = %d\n",
 			__func__, sec->cmd_param[0]);
@@ -393,11 +397,13 @@ static void set_noise_mode_enable(void *device_data)
 	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_SYSFS, true);
 	sec_cmd_set_default_result(sec);
 
-	if (sec->cmd_param[0] == 1)
+	if (sec->cmd_param[0] == 1) {
 		para = NOISE_MODE_DEFALUT;
-	else if (sec->cmd_param[0] == 0)
+		ts->fw_noise_enabled = true;
+	} else if (sec->cmd_param[0] == 0) {
 		para = NOISE_MODE_OFF;
-	else {
+		ts->fw_noise_enabled = false;
+	} else {
 		input_info(true, &ts->client->dev,
 			"%s: param error! param = %d\n",
 			__func__, sec->cmd_param[0]);
@@ -1348,6 +1354,10 @@ static ssize_t status_show(struct device *dev,
 	written += scnprintf(buf + written, PAGE_SIZE - written,
 			     "Touch status: %#x, %#x, %#x, %#x\n",
 			     data[0], data[1], data[2], data[3]);
+	written += scnprintf(buf + written, PAGE_SIZE - written,
+			     "Filters: grip=%d, noise=%d, deadzone=%d, palm=%d\n",
+			     ts->fw_grip_enabled, ts->fw_noise_enabled,
+			     ts->fw_deadzone_enabled, ts->fw_palm_enabled);
 
 	memset(data, 0x0, 2);
 	ret = ts->sec_ts_read(ts, SEC_TS_CMD_SET_TOUCHFUNCTION, data, 2);
@@ -5321,6 +5331,7 @@ static void dead_zone_enable(void *device_data)
 		sec->cmd_state = SEC_CMD_STATUS_FAIL;
 	} else {
 		data = sec->cmd_param[0];
+		ts->fw_deadzone_enabled = (data != 0);
 
 		ret = ts->sec_ts_write(ts, SEC_TS_CMD_EDGE_DEADZONE, &data, 1);
 		if (ret < 0) {

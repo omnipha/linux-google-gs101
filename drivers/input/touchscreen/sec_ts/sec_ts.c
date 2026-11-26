@@ -52,6 +52,8 @@ static int sec_ts_input_open(struct input_dev *dev);
 static void sec_ts_input_close(struct input_dev *dev);
 #endif
 
+static void sec_ts_setup_firmware_filters(struct sec_ts_data *ts);
+
 static int register_panel_bridge(struct sec_ts_data *ts);
 static void unregister_panel_bridge(struct drm_bridge *bridge);
 
@@ -1489,6 +1491,7 @@ static void sec_ts_reinit(struct sec_ts_data *ts)
 	} else {
 
 		sec_ts_set_grip_type(ts, ONLY_EDGE_HANDLER);
+		sec_ts_setup_firmware_filters(ts);
 
 		if (ts->dex_mode) {
 			input_info(true, &ts->client->dev,
@@ -2152,7 +2155,7 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 				if (!ts->offload.offload_running) {
 #endif
 				input_mt_slot(ts->input_dev, t_id);
-				if (ts->coord[t_id].palm)
+				if (ts->coord[t_id].palm || ts->coord[t_id].grip)
 					input_mt_report_slot_state(
 						ts->input_dev, MT_TOOL_PALM, 1);
 				else
@@ -2232,7 +2235,7 @@ static void sec_ts_handle_coord_event(struct sec_ts_data *ts,
 				}
 #endif
 				input_mt_slot(ts->input_dev, t_id);
-				if (ts->coord[t_id].palm)
+				if (ts->coord[t_id].palm || ts->coord[t_id].grip)
 					input_mt_report_slot_state(
 						ts->input_dev, MT_TOOL_PALM, 1);
 				else
@@ -5165,6 +5168,48 @@ static void sec_ts_reset_work(struct work_struct *work)
 }
 #endif
 
+static void sec_ts_setup_firmware_filters(struct sec_ts_data *ts)
+{
+	int ret;
+	u8 noise_mode = NOISE_MODE_DEFALUT;
+	u8 deadzone = 1;
+	u8 palm_detec = 1;
+
+	ret = sec_ts_enable_fw_grip(ts, true);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to enable fw grip: %d\n", __func__, ret);
+	else
+		ts->fw_grip_enabled = true;
+	sec_ts_delay(10);
+
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SET_NOISE_MODE, &noise_mode, 1);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to set noise mode: %d\n", __func__, ret);
+	else {
+		input_info(true, &ts->client->dev, "%s: noise mode enabled\n", __func__);
+		ts->fw_noise_enabled = true;
+	}
+	sec_ts_delay(10);
+
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_EDGE_DEADZONE, &deadzone, 1);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to set deadzone: %d\n", __func__, ret);
+	else {
+		input_info(true, &ts->client->dev, "%s: dead zone enabled\n", __func__);
+		ts->fw_deadzone_enabled = true;
+	}
+	sec_ts_delay(10);
+
+	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SET_PALM_DETEC, &palm_detec, 1);
+	if (ret < 0)
+		input_err(true, &ts->client->dev, "%s: failed to set palm detection: %d\n", __func__, ret);
+	else {
+		input_info(true, &ts->client->dev, "%s: palm detection enabled\n", __func__);
+		ts->fw_palm_enabled = true;
+	}
+	sec_ts_delay(10);
+}
+
 static int sec_ts_init_touch_mode(struct sec_ts_data *ts)
 {
 	int ret;
@@ -5193,8 +5238,9 @@ static int sec_ts_init_touch_mode(struct sec_ts_data *ts)
 		input_err(true, &ts->client->dev, "%s: failed to set touch functions: %d\n", __func__, ret);
 	sec_ts_delay(20);
 
-	/* 4. Configure grip/edge rejection */
+	/* 4. Configure grip/edge rejection and firmware filters */
 	sec_ts_set_grip_type(ts, ONLY_EDGE_HANDLER);
+	sec_ts_setup_firmware_filters(ts);
 
 	/* 5. Command SENSE_ON */
 	ret = ts->sec_ts_write(ts, SEC_TS_CMD_SENSE_ON, NULL, 0);
@@ -5405,6 +5451,7 @@ static int sec_ts_input_open(struct input_dev *dev)
 
 	/* because edge and dead zone will recover soon */
 	sec_ts_set_grip_type(ts, ONLY_EDGE_HANDLER);
+	sec_ts_setup_firmware_filters(ts);
 
 	sec_ts_set_bus_ref(ts, SEC_TS_BUS_REF_INPUT_DEV, false);
 
@@ -5659,6 +5706,7 @@ int sec_ts_start_device(struct sec_ts_data *ts)
 	#endif
 
 	sec_ts_set_grip_type(ts, ONLY_EDGE_HANDLER);
+	sec_ts_setup_firmware_filters(ts);
 
 	if (ts->dex_mode) {
 		input_info(true, &ts->client->dev,

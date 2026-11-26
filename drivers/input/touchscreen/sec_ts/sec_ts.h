@@ -1035,6 +1035,11 @@ struct sec_ts_data {
 	u8 cover_cmd;
 	u16 rect_data[4];
 
+	bool fw_grip_enabled;
+	bool fw_noise_enabled;
+	bool fw_deadzone_enabled;
+	bool fw_palm_enabled;
+
 	int tspid_val;
 	int tspicid_val;
 
