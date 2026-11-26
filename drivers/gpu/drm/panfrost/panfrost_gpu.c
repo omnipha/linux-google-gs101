@@ -203,6 +203,13 @@ struct panfrost_model {
 }
 #define GPU_REV(name, r, p) GPU_REV_EXT(name, r, p, 0, )
 
+#ifndef hw_features_g78
+#define hw_features_g78 hw_features_g57
+#endif
+#ifndef hw_issues_g78
+#define hw_issues_g78 0
+#endif
+
 static const struct panfrost_model gpu_models[] = {
 	/* T60x has an oddball version */
 	GPU_MODEL(t600, 0x600,
@@ -242,6 +249,9 @@ static const struct panfrost_model gpu_models[] = {
 	/* MediaTek MT8188 Mali-G57 MC3 */
 	GPU_MODEL(g57, 0x9093,
 		GPU_REV(g57, 0, 0)),
+
+	/* Mali-G78 (Valhall Gen2, Tensor GS101) */
+	GPU_MODEL(g78, 0x9002),
 	{0},
 };
 
