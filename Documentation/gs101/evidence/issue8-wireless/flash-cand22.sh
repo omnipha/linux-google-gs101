@@ -5,17 +5,45 @@
 # PREPARED ONLY - DO NOT EXECUTE WHILE ROLLBACK UNIT IS ACTIVE OR DEVICE OFFLINE.
 set -u
 
-TS=$(date +%Y%m%d-%H%M%S)
-LOG="/tmp/opencode/gs101/evidence/flash-cand22-${TS}.log"
-RESULT_JSON="/tmp/opencode/gs101/evidence/flash-cand22-${TS}.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MB010_ROOT="/home/gregor/phone-second-life-data/mb010"
 
-BOOT_IMG="/tmp/opencode/gs101/cand22/boot.img"
-ROLLBACK_BOOT="/tmp/opencode/gs101/cand14/boot.img"
+# Result and evidence directory defaults
+EVIDENCE_DIR="${EVIDENCE_DIR:-${RESULT_DIR:-${MB010_ROOT}/flash-scripts}}"
+if [ ! -d "${EVIDENCE_DIR}" ] && [ -d "/tmp/opencode/gs101/evidence" ]; then
+    EVIDENCE_DIR="/tmp/opencode/gs101/evidence"
+fi
+RESULT_DIR="${RESULT_DIR:-${EVIDENCE_DIR}}"
+mkdir -p "${RESULT_DIR}"
+
+TS=$(date +%Y%m%d-%H%M%S)
+LOG="${RESULT_DIR}/flash-cand22-${TS}.log"
+RESULT_JSON="${RESULT_DIR}/flash-cand22-${TS}.json"
+
+# Image path defaults with fallback to /tmp
+BOOT_IMG="${BOOT_IMG:-${MB010_ROOT}/cand-images/cand22-boot.img}"
+if [ ! -f "${BOOT_IMG}" ] && [ -f "/tmp/opencode/gs101/cand22/boot.img" ]; then
+    BOOT_IMG="/tmp/opencode/gs101/cand22/boot.img"
+fi
+
+ROLLBACK_BOOT="${ROLLBACK_BOOT:-${MB010_ROOT}/cand-images/cand14-boot-rollback.img}"
+if [ ! -f "${ROLLBACK_BOOT}" ] && [ -f "/tmp/opencode/gs101/cand14/boot.img" ]; then
+    ROLLBACK_BOOT="/tmp/opencode/gs101/cand14/boot.img"
+fi
+
+KNOWN_HOSTS_FILE="${KNOWN_HOSTS_FILE:-${MB010_ROOT}/deploy-harden/ssh/known_hosts}"
+if [ ! -f "${KNOWN_HOSTS_FILE}" ] && [ -f "/tmp/opencode/gs101/issue4/known_hosts" ]; then
+    KNOWN_HOSTS_FILE="/tmp/opencode/gs101/issue4/known_hosts"
+fi
+
+SSH_HELPER="${SSH_HELPER:-${MB010_ROOT}/flash-scripts/sshc.sh}"
+if [ ! -f "${SSH_HELPER}" ] && [ -f "/tmp/opencode/gs101/issue4/sshc.sh" ]; then
+    SSH_HELPER="/tmp/opencode/gs101/issue4/sshc.sh"
+fi
 
 EXPECT_CAND22_BOOT="4c172f54ef5280c3bd63337613fd909f6695ab1d2c777f9913e658f05ca3fcf9"
 EXPECT_ROLLBACK_BOOT="84323d06a8df3b2cdcc9e05ccba802951e123d4cf2bc28ba781358f69020de36"
 
-mkdir -p /tmp/opencode/gs101/evidence
 exec > >(tee -a "$LOG") 2>&1
 
 echo "=== FLASH cand22 start at $(date -Iseconds) ==="
@@ -52,11 +80,17 @@ echo "cand22 boot:    $ACT_CAND22_BOOT  $BOOT_IMG"
 echo "rollback boot:  $ACT_ROLLBACK_BOOT  $ROLLBACK_BOOT"
 
 echo "--- checking SSH connectivity to reboot to bootloader ---"
-if ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
+if ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" \
        -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=2 \
        user@172.16.42.1 'echo ONLINE' >/dev/null 2>&1; then
     echo "SSH reachable: requesting reboot to bootloader..."
-    /tmp/opencode/gs101/issue4/sshc.sh 'sudo reboot bootloader' || true
+    if [ -x "${SSH_HELPER}" ]; then
+        "${SSH_HELPER}" 'sudo reboot bootloader' || true
+    else
+        ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile="${KNOWN_HOSTS_FILE}" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=2 \
+            user@172.16.42.1 'sudo reboot bootloader' || true
+    fi
 else
     echo "SSH not reachable (device may already be in fastboot mode), skipping reboot command."
 fi

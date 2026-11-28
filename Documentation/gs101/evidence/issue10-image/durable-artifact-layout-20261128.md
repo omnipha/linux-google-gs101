@@ -19,12 +19,15 @@ To ensure complete resilience against volatile `/tmp` resets across host reboots
 │   └── gs101-prep-bundle-20261128.tar.gz.sha256
 ├── cand-images/
 │   ├── cand14-boot-rollback.img           # Candidate 14 baseline boot image (known-good rollback)
+│   ├── cand18-vendor_boot-rollback.img    # Candidate 18 vendor_boot image (known-good rollback guard)
 │   ├── cand22-boot.img                    # Candidate 22 boot image (modular panfrost + pci-exynos)
-│   └── cand23-vendor_boot.img             # Candidate 23 vendor_boot image (PCIe RC1 + USI16/UART16 BT DTB)
+│   ├── cand23-vendor_boot.img             # Candidate 23 vendor_boot image (PCIe RC1 + USI16/UART16 BT DTB)
+│   └── SHA256SUMS                         # Checksum manifest for cand images
 ├── deploy-harden/
 │   ├── gpu-modules/                       # Mali-G78 GPU acceleration modules
 │   │   ├── gpu-sched.ko                   # DRM GPU scheduler (vermagic 7.3.0-rc6-gs101)
-│   │   └── panfrost.ko                    # Panfrost driver with 0x9002 entry & MMU quirk
+│   │   ├── panfrost.ko                    # Panfrost driver with 0x9002 entry & MMU quirk
+│   │   └── SHA256SUMS                     # Checksum manifest for GPU modules
 │   ├── modules/                           # Out-of-tree & modular WLAN/BT/PCIe drivers
 │   │   ├── bcmdhd.ko                      # Broadcom BCM4389 FullMAC Wi-Fi driver
 │   │   ├── bluetooth.ko                   # Core Bluetooth subsystem
@@ -41,8 +44,10 @@ To ensure complete resilience against volatile `/tmp` resets across host reboots
 │       └── firmware/                      # 16 extracted BCM4389 Wi-Fi and BT firmware/NVRAM blobs
 └── flash-scripts/
     ├── cand14-rollback.sh                 # Fastboot rollback writer invoked by systemd unit
-    ├── flash-cand22.sh                    # Candidate 22 flash script
-    ├── flash-cand23.sh                    # Candidate 23 flash script (cand22 boot_a + cand23 vendor_boot_a)
+    ├── flash-cand22.sh                    # Candidate 22 flash script (hardened ENV defaults)
+    ├── flash-cand23.sh                    # Candidate 23 flash script (hardened ENV defaults)
+    ├── rearm-cand14-after-cap.sh          # Prepared re-arm helper (armed after 00:11:03 cap)
+    ├── sshc.sh                            # SSH command execution helper
     └── SHA256SUMS                         # Cryptographic checksum manifest
 ```
 
@@ -55,6 +60,7 @@ All artifacts have been verified using SHA-256 and confirm 100% binary reproduci
 | Artifact Path | SHA-256 Checksum | Purpose / Specification |
 | :--- | :--- | :--- |
 | `cand-images/cand14-boot-rollback.img` | `84323d06a8df3b2cdcc9e05ccba802951e123d4cf2bc28ba781358f69020de36` | Rollback boot image (cand14 baseline, 64 MB) |
+| `cand-images/cand18-vendor_boot-rollback.img` | `8a6840fbbc2035862a46123f5b25539d1085903a16d38a8904bb2966142ac818` | Rollback vendor_boot image (cand18 baseline guard, 64 MB) |
 | `cand-images/cand22-boot.img` | `4c172f54ef5280c3bd63337613fd909f6695ab1d2c777f9913e658f05ca3fcf9` | Candidate 22 boot image (modular GPU, 64 MB) |
 | `cand-images/cand23-vendor_boot.img` | `1d3f3a7e2fa2759d656651673b2ea0c84d0f92c53ff9d3a2e4766d19f0424c9d` | Candidate 23 vendor_boot image (PCIe/BT DTB, 64 MB) |
 | `bundles/gs101-prep-bundle-20261128.tar.gz` | `2f7214032c3ffb896a3aaf7d9e5ebf7b8025866900ca543c2b911f2e1ce770d3` | Full deployment bundle (10 modules, 16 firmware) |
@@ -69,8 +75,11 @@ All artifacts have been verified using SHA-256 and confirm 100% binary reproduci
 | `deploy-harden/modules/btbcm.ko` | `4588764e0cd8b0240e828fbcffdeec56e511759172653e6b4b1590a760da9139` | Broadcom Bluetooth helper (30,976 B) |
 | `deploy-harden/modules/btqca.ko` | `130dd738c7c6d5496fb3dec7a1e4993f0247eb9cc0c18eeadc29001a04e7fb66` | Qualcomm Bluetooth helper (40,328 B) |
 | `deploy-harden/ssh/known_hosts` | `be0b9d84069fae0eaa3f816db1a08333116564d93cb1102acac7c5cbc9e7bf26` | Target SSH ECDSA key verification |
-| `flash-scripts/flash-cand23.sh` | `965db9062167d4706537935deda16169de9453394c850d5bfe7134f57652c305` | Canonical fastboot flash script |
+| `flash-scripts/flash-cand22.sh` | `10eff17b1c0be4f67113ef5c8ec6fe1b6c91d8ce1bf7a1575839b3ce97182e82` | Candidate 22 flash script (hardened ENV defaults) |
+| `flash-scripts/flash-cand23.sh` | `33d7ebc9a2d0cee3e51e13075d6ec3768fdc08d99d1b38ceaea3a2f689bac444` | Candidate 23 flash script (hardened ENV defaults) |
 | `flash-scripts/cand14-rollback.sh` | `bb480a4e4eb329bd27e19b43bf855b922d7f027efeb16b5f079600d109fcc9e5` | Rollback service execution script |
+| `flash-scripts/rearm-cand14-after-cap.sh` | `1986e7464abcb751ff27505149828a1ce7754cc6e8d6c8c8b2ba3ba6cb507d09` | Prepared post-cap rollback re-arm helper |
+| `flash-scripts/sshc.sh` | `f5abe1af4a6bcb9721271ca07ac5615d5fa67880b96733e5861af6d42a5fb6f4` | SSH execution helper script |
 
 ---
 
@@ -93,10 +102,30 @@ All operational test and deployment scripts in [Documentation/gs101/tests/](file
 | | `KNOWN_HOSTS_FILE` | `/home/gregor/.../mb010/deploy-harden/ssh/known_hosts` | `/tmp/opencode/gs101/issue4/known_hosts` |
 | [verify-recovery.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/verify-recovery.sh) | `EVIDENCE_DIR` | `/home/gregor/.../mb010/artifact-backup` | `/tmp/opencode/gs101/evidence` |
 | | `KNOWN_HOSTS_FILE` | `/home/gregor/.../mb010/deploy-harden/ssh/known_hosts` | `/tmp/opencode/gs101/issue4/known_hosts` |
+| [flash-cand22.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue8-wireless/flash-cand22.sh) | `BOOT_IMG` | `/home/gregor/.../mb010/cand-images/cand22-boot.img` | `/tmp/opencode/gs101/cand22/boot.img` |
+| | `ROLLBACK_BOOT` | `/home/gregor/.../mb010/cand-images/cand14-boot-rollback.img` | `/tmp/opencode/gs101/cand14/boot.img` |
+| | `KNOWN_HOSTS_FILE` | `/home/gregor/.../mb010/deploy-harden/ssh/known_hosts` | `/tmp/opencode/gs101/issue4/known_hosts` |
+| | `SSH_HELPER` | `/home/gregor/.../mb010/flash-scripts/sshc.sh` | `/tmp/opencode/gs101/issue4/sshc.sh` |
+| | `EVIDENCE_DIR` / `RESULT_DIR` | `/home/gregor/.../mb010/flash-scripts` | `/tmp/opencode/gs101/evidence` |
+| [flash-cand23.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue8-wireless/flash-cand23.sh) | `BOOT_IMG` | `/home/gregor/.../mb010/cand-images/cand22-boot.img` | `/tmp/opencode/gs101/cand22/boot.img` |
+| | `VENDOR_BOOT_IMG` | `/home/gregor/.../mb010/cand-images/cand23-vendor_boot.img` | `/tmp/opencode/gs101/cand23/vendor_boot.img` |
+| | `ROLLBACK_BOOT` | `/home/gregor/.../mb010/cand-images/cand14-boot-rollback.img` | `/tmp/opencode/gs101/cand14/boot.img` |
+| | `ROLLBACK_VENDOR` | `/home/gregor/.../mb010/cand-images/cand18-vendor_boot-rollback.img` | `/tmp/opencode/gs101/cand18/vendor_boot.img` |
+| | `KNOWN_HOSTS_FILE` | `/home/gregor/.../mb010/deploy-harden/ssh/known_hosts` | `/tmp/opencode/gs101/issue4/known_hosts` |
+| | `SSH_HELPER` | `/home/gregor/.../mb010/flash-scripts/sshc.sh` | `/tmp/opencode/gs101/issue4/sshc.sh` |
+| | `EVIDENCE_DIR` / `RESULT_DIR` | `/home/gregor/.../mb010/flash-scripts` | `/tmp/opencode/gs101/evidence` |
 
 ---
 
-## 4. Post-Reboot Reconstitution Procedure
+## 4. Rollback Service Re-Arm & Forensics Reference
+
+- **Single-Writer Safety Invariant**: `cand14-rollback.service` (Main PID `1432080`, armed until 2026-11-29 00:11:03 CET) remains the sole active flash writer.
+- **Prepared Re-Arm Procedure**: [rearm-cand14-after-cap.sh](file:///home/gregor/phone-second-life-data/mb010/flash-scripts/rearm-cand14-after-cap.sh) enforces 5 duplicate guards (`pgrep` check, `systemctl is-active` check, unclosed log check, flash result check, and script sha256). Re-arming is performed by the supervisor following the 00:11:03 CET cap.
+- **Forensics Investigation**: See [rollback-rearm-forensics-20261128.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/rollback-rearm-forensics-20261128.md) for complete forensic traces and analysis of the ephemeral PID 1557166 process.
+
+---
+
+## 5. Post-Reboot Reconstitution Procedure
 
 If the host machine reboots prior to operator recovery, `/tmp` will be wiped cleanly by the operating system. To restore the working cache and run verification, execute:
 

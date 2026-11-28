@@ -50,6 +50,9 @@ Permanently versioned in repository under [Documentation/gs101/tests/](file:///h
 - [unload-gpu.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/unload-gpu.sh): Cleans `/etc/modules-load.d/panfrost.conf` and unloads `panfrost` and `gpu_sched`.
 - [install-apps.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-apps.sh): Configures persistent default route (`172.16.42.2 dev usb0`) and DNS (`1.1.1.1` in `systemd-resolved`), and installs minimal application set (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) with offline local depot fallback (`/home/gregor/phone-second-life-data/mb010/apk-depot/aarch64`).
 - [verify-recovery.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/verify-recovery.sh): Host-side acceptance audit gathering system telemetry and emitting JSON evidence into durable backup `/home/gregor/phone-second-life-data/mb010/artifact-backup`. Exits with code `0` only when all checks evaluate to `PASS` or expected `INFO` (`FAIL == 0`).
+- [flash-cand22.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue8-wireless/flash-cand22.sh): Single-shot fastboot flash script for `cand22` (`boot_a`), hardened with durable defaults (`BOOT_IMG`, `ROLLBACK_BOOT`, `KNOWN_HOSTS_FILE`, `SSH_HELPER`, `EVIDENCE_DIR`/`RESULT_DIR`) rooted in permanent storage `/home/gregor/phone-second-life-data/mb010/`.
+- [flash-cand23.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue8-wireless/flash-cand23.sh): Consolidated fastboot flash script (`boot_a` + `vendor_boot_a`), hardened with durable defaults including rollback guards `cand14` boot and `cand18` vendor_boot (`8a6840fb...`). Sourced from permanent storage with `/tmp` fallbacks.
+- [rearm-cand14-after-cap.sh](file:///home/gregor/phone-second-life-data/mb010/flash-scripts/rearm-cand14-after-cap.sh): Prepared safe re-arm helper guarding against duplicate writers; armed by supervisor post 2026-11-29 00:11:03 cap (see [rollback-rearm-forensics-20261128.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/rollback-rearm-forensics-20261128.md)).
 
 ---
 
@@ -59,7 +62,7 @@ Permanently versioned in repository under [Documentation/gs101/tests/](file:///h
 | :--- | :--- | :--- | :--- |
 | **Phase 1** | USB CDC-NCM Host Setup | `sudo ip addr add 172.16.42.2/24 dev enx*` | SSH responds on `user@172.16.42.1` |
 | **Phase 2** | Live Panfrost Safe Test | `insmod /tmp/gpu-sched.ko && insmod /tmp/panfrost.ko` | `/dev/dri/renderD128` exists, zero kernel oops/panic |
-| **Phase 3** | Consolidated Flash | `/tmp/opencode/gs101/flash-cand23.sh` | Flashes `cand22` `boot_a` + `cand23` `vendor_boot_a` |
+| **Phase 3** | Consolidated Flash | `Documentation/gs101/evidence/issue8-wireless/flash-cand23.sh` | Flashes `cand22` `boot_a` + `cand23` `vendor_boot_a` (durable mb010 defaults) |
 | **Phase 4.1** | Boot Verification | `uname -a; cat /proc/cmdline` | `7.3.0-rc6-gs101` (no `+`), `console=tty0`, `simpledrm` |
 | **Phase 4.2** | Persistent GPU Loading | `Documentation/gs101/tests/install-gpu.sh` | `modprobe panfrost` clean, `/etc/modules-load.d/panfrost.conf` created |
 | **Phase 4.3** | Phoc Acceleration | `WLR_RENDERER=gles2` override in `phosh.service.d` | Phoc log: Mali-G78 renderer, `grim /tmp/phosh-gles2.png` captured |
