@@ -165,21 +165,113 @@ bcm4389_naming_table
 
 ---
 
-## 4. Next Steps for Hardware Testing Post-Recovery
+## 4. Deployment Bundle (`/tmp/opencode/gs101/wlan-bundle/`)
 
-Once physical operator recovery of the Pixel 6 Pro device is completed and Fastboot / SSH access is verified:
+To provide an operational, self-contained deployment package for Issue #8 (BCM4389 Wi-Fi & Bluetooth), the staged kernel modules, firmware blobs, calibration files, and module dependency metadata were structured into a deployment bundle at `/tmp/opencode/gs101/wlan-bundle/`.
 
-1. **Kernel & Device Tree Flash:**
-   - Execute prepared `flash-cand22.sh` (or `cand20` depending on test plan) and `flash-cand23.sh` to flash the updated `gs101-raven.dtb` containing `pcie@14520000` (PCIe RC1) and `CONFIG_PCI_EXYNOS=y`.
-2. **Firmware & NVRAM Deployment:**
-   - Sideload firmware blobs from `/home/gregor/phone-second-life-data/mb010/firmware/bcm4389-extracted/` to `/lib/firmware/postmarketos/` or `/vendor/firmware/fw_bcmdhd.bin` and calibration files to `/vendor/etc/wifi/bcmdhd.cal`.
-3. **Module Sideloading & Loading:**
-   - Transfer `bcmdhd.ko` to the device:
+### 4.1 Bundle Structure & File Inventory
+
+The bundle layout mirrors the target root filesystem layout:
+
+```
+/tmp/opencode/gs101/wlan-bundle/
+├── install-wlan.sh                  # Sideload & activation script (target 172.16.42.1)
+├── unload-wlan.sh                   # Reverse-order teardown script
+├── README.md                        # Deployment documentation & hardware disclaimer
+├── SHA256SUMS                       # Checksums over all bundle files
+├── lib/
+│   ├── firmware/
+│   │   ├── bcmdhd.cal               # Default NVRAM calibration data (mode 0644)
+│   │   ├── bcmdhd.cal_JPN           # Regional calibration (Japan)
+│   │   ├── bcmdhd.cal_MMW           # Regional calibration (mmWave variant)
+│   │   ├── bcmdhd.cal_PROTO1.0      # Hardware proto 1.0 calibration
+│   │   ├── bcmdhd.cal_PROTO1.1      # Hardware proto 1.1 calibration
+│   │   ├── bcmdhd.cal_ROW           # Regional calibration (Rest of World)
+│   │   ├── bcmdhd_clm.blob          # Default Country Locale Matrix (CLM) blob
+│   │   ├── bcmdhd_clm.blob_JPN      # Regional CLM blob (Japan)
+│   │   ├── bcmdhd_clm.blob_MMW      # Regional CLM blob (mmWave variant)
+│   │   ├── bcmdhd_clm.blob_ROW      # Regional CLM blob (Rest of World)
+│   │   ├── brcm/
+│   │   │   ├── BCM.hcd              # Bluetooth patchram firmware
+│   │   │   ├── BTFW_B.hcd           # Bluetooth firmware revision B
+│   │   │   └── BTFW_D.hcd           # Bluetooth firmware revision D
+│   │   ├── fw_bcmdhd.bin            # Main BCM4389 Wi-Fi FullMAC microcode (1.76 MB)
+│   │   ├── fw_bcmdhd.map            # Firmware memory map & symbol table
+│   │   └── google_wifi_firmware_config_info.pb # Firmware config protobuf
+│   └── modules/
+│       └── 7.3.0-rc6-gs101/
+│           ├── extra/
+│           │   ├── bcmdhd.ko        # Broadcom FullMAC PCIe driver (vermagic 7.3.0-rc6-gs101)
+│           │   ├── cfg80211.ko      # Linux wireless configuration core
+│           │   └── rfkill.ko        # Radio kill-switch subsystem
+│           ├── modules.alias
+│           ├── modules.alias.bin
+│           ├── modules.builtin.alias.bin
+│           ├── modules.builtin.bin
+│           ├── modules.dep          # Pre-computed module dependency index
+│           ├── modules.dep.bin
+│           ├── modules.devname
+│           ├── modules.softdep
+│           ├── modules.symbols
+│           ├── modules.symbols.bin
+│           └── modules.weakdep
+```
+
+### 4.2 Module & Blob Provenance and Checksums
+
+All bundle files have been statically verified against their build origins:
+
+| Relative Bundle Path | Origin / Source | Size (bytes) | SHA-256 Checksum |
+| :--- | :--- | :--- | :--- |
+| `lib/modules/7.3.0-rc6-gs101/extra/bcmdhd.ko` | `/tmp/opencode/gs101/bcmdhd73/bcmdhd.ko` | 8,653,152 | `8f6ad033353aa0c9c9f4eb79d3f301c1727a1b2af9e57d462c82f027f4410ffb` |
+| `lib/modules/7.3.0-rc6-gs101/extra/cfg80211.ko` | `net/wireless/cfg80211.ko` (in-tree) | 1,990,552 | `11a9e57a2fd81d382fab440cd9ef0ed8f039714c9701f6175668d408b97aa987` |
+| `lib/modules/7.3.0-rc6-gs101/extra/rfkill.ko` | `net/rfkill/rfkill.ko` (in-tree) | 61,480 | `7b2e9b268c059fae423afe78ba13c3955a36f8b70d470c37ea4db597de6144d5` |
+| `lib/firmware/fw_bcmdhd.bin` | Extract depot (`firmware/fw_bcmdhd.bin`) | 1,764,018 | `3a6dbf5a726304f83e154ff1b265a06c77d669506eb5c784fd864f10bdda6533` |
+| `lib/firmware/bcmdhd.cal` | Extract depot (`firmware/bcmdhd.cal`) | 24,530 | `a16987752c7de8b026d18c1348f350a48ec062e2570c44d6c778847fab8cc801` |
+| `lib/firmware/bcmdhd_clm.blob` | Extract depot (`firmware/bcmdhd_clm.blob`) | 16,260 | `5ae4086e69f310f7a67df3a1e8e3537f229205c1ce2d7ad520e4217b04044d64` |
+| `lib/firmware/fw_bcmdhd.map` | Extract depot (`firmware/fw_bcmdhd.map`) | 1,855,772 | `a94c07725ac5b6132541052b7523f5f6afab020b8e9861f03e0a59b9b79ef727` |
+| `lib/firmware/google_wifi_firmware_config_info.pb` | Extract depot | 513 | `fad8765802deef04b10fea417a4934c225b90d694f8aa232be87ac3a28cc10a7` |
+| `lib/firmware/brcm/BCM.hcd` | Extract depot (`firmware/brcm/BCM.hcd`) | 474,858 | `33124cc86e78563c3c730c76f1630ec2790be63cadc441bcda352c44b07c223c` |
+| `lib/firmware/brcm/BTFW_B.hcd` | Extract depot (`firmware/brcm/BTFW_B.hcd`) | 474,047 | `429e254d0c139f7e3ed8b04fc369d8b3bfcd1aaf2c31c389359c6ddbe21a5d62` |
+| `lib/firmware/brcm/BTFW_D.hcd` | Extract depot (`firmware/brcm/BTFW_D.hcd`) | 474,861 | `7d029d2fd3f7a8dbc70f5623eb7fa896f3beee48c9247c3f98231a36d8a6210b` |
+
+### 4.3 Static Verification Results
+
+1. **Module Dependency Tree (`modules.dep`):**
+   Generated with `/sbin/depmod -b /tmp/opencode/gs101/wlan-bundle 7.3.0-rc6-gs101`:
+   ```
+   extra/rfkill.ko:
+   extra/cfg80211.ko: extra/rfkill.ko
+   extra/bcmdhd.ko: extra/cfg80211.ko extra/rfkill.ko
+   ```
+2. **Checksum Integrity:**
+   All 33 files in the bundle match `SHA256SUMS` (`sha256sum -c SHA256SUMS` output: 33 OK, 0 failures).
+3. **Firmware Path Verification:**
+   Strings embedded in `bcmdhd.ko` (`fw_bcmdhd.bin`, `bcmdhd.cal`, `bcmdhd_clm.blob`, `fw_bcmdhd.map`) match standard `request_firmware()` paths relative to `/lib/firmware/`. Default search path is `/lib/firmware/`; module parameter `firmware_path=/lib/firmware/fw_bcmdhd.bin` and `nvram_path=/lib/firmware/bcmdhd.cal` can be provided optionally.
+
+---
+
+## 5. Hardware Testing & Deployment Sequence (Device-Gated)
+
+> [!IMPORTANT]
+> The physical Pixel 6 Pro device remains powered off awaiting operator physical recovery. `cand14-rollback.service` (PID 1432080, cap Nov 29 00:11:03) remains the sole authorized flash writer. `install-wlan.sh` and flash scripts must NOT be executed while the device is offline or unverified.
+
+Once physical operator recovery is complete and Fastboot / SSH connectivity is verified:
+
+1. **Bootloader & Device Tree Flash:**
+   - Execute prepared `flash-cand22.sh` and `flash-cand23.sh` to flash `cand22` (`boot_a`, `CONFIG_PCI_EXYNOS=y`) and `cand23` (`vendor_boot_a`, updated DTB containing `pcie@14520000`).
+2. **Target Sideloading via `install-wlan.sh`:**
+   - Run `/tmp/opencode/gs101/wlan-bundle/install-wlan.sh` to rsync modules and firmware to target (`user@172.16.42.1`), run `depmod -a`, and load modules in order:
      ```bash
-     scp /tmp/opencode/gs101/bcmdhd73/bcmdhd.ko root@192.168.2.15:/lib/modules/7.3.0-rc6-gs101/kernel/drivers/net/wireless/
-     ssh root@192.168.2.15 "depmod -a && modprobe bcmdhd"
+     sudo modprobe rfkill && sudo modprobe cfg80211 && sudo modprobe bcmdhd
      ```
-4. **Verification Commands on Target:**
-   - Verify PCIe discovery: `lspci -nn -k` (expect `14e4:4441` or `14e4:4389` bound to `bcmdhd`).
-   - Verify network interface: `iw dev` or `ip link show wlan0`.
-   - Test Wi-Fi scan: `iw dev wlan0 scan`.
+3. **Module Unload Sequence (`unload-wlan.sh`):**
+   - For clean teardown or reconfiguration:
+     ```bash
+     sudo rmmod bcmdhd && sudo rmmod cfg80211 && sudo rmmod rfkill
+     ```
+4. **Live Target Verification Commands:**
+   - PCIe discovery: `lspci -nn -k` (expect `14e4:4441` or `14e4:4389` bound to `bcmdhd`).
+   - Interface initialization: `ip link show wlan0` or `iw dev`.
+   - RFKill state: `rfkill list`.
+   - Scan test: `iw dev wlan0 scan`.
