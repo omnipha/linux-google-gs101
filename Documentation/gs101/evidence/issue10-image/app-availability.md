@@ -92,6 +92,10 @@ EOF
 ---
 
 ### Step 3.2: Install Minimal Application Set via `apk`
+
+> [!TIP]
+> **Offline Installation Fallback**: If DNS resolution or internet uplink is unavailable on the target device, use the pre-built offline package depot ([apk-depot.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/apk-depot.md)) via SCP sideloading (`sudo apk add --allow-untrusted --repository /tmp/apk-depot foot lxterminal pcmanfm galculator gnome-calculator`).
+
 Run on the host:
 ```bash
 ssh user@172.16.42.1 << 'EOF'
