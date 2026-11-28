@@ -6,8 +6,29 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_HOST="${TARGET_HOST:-172.16.42.1}"
 TARGET_USER="${TARGET_USER:-user}"
-KERNEL_VER="7.3.0-rc6-gs101"
-SSH_OPTS="-i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=3"
+KERNEL_VER="${KERNEL_VER:-7.3.0-rc6-gs101}"
+
+# Durable module and firmware source paths with fallbacks
+MODULE_SOURCE_DIR="${MODULE_SOURCE_DIR:-/home/gregor/phone-second-life-data/mb010/deploy-harden/modules}"
+if [ ! -d "${MODULE_SOURCE_DIR}" ] && [ -d "${SCRIPT_DIR}/lib/modules/${KERNEL_VER}/extra" ]; then
+    MODULE_SOURCE_DIR="${SCRIPT_DIR}/lib/modules/${KERNEL_VER}/extra"
+elif [ ! -d "${MODULE_SOURCE_DIR}" ] && [ -d "/tmp/opencode/gs101/wlan-bundle/lib/modules/${KERNEL_VER}/extra" ]; then
+    MODULE_SOURCE_DIR="/tmp/opencode/gs101/wlan-bundle/lib/modules/${KERNEL_VER}/extra"
+fi
+
+FIRMWARE_SOURCE_DIR="${FIRMWARE_SOURCE_DIR:-/home/gregor/phone-second-life-data/mb010/firmware/bcm4389-extracted/firmware}"
+if [ ! -d "${FIRMWARE_SOURCE_DIR}" ] && [ -d "${SCRIPT_DIR}/lib/firmware" ]; then
+    FIRMWARE_SOURCE_DIR="${SCRIPT_DIR}/lib/firmware"
+elif [ ! -d "${FIRMWARE_SOURCE_DIR}" ] && [ -d "/tmp/opencode/gs101/wlan-bundle/lib/firmware" ]; then
+    FIRMWARE_SOURCE_DIR="/tmp/opencode/gs101/wlan-bundle/lib/firmware"
+fi
+
+KNOWN_HOSTS_FILE="${KNOWN_HOSTS_FILE:-/home/gregor/phone-second-life-data/mb010/deploy-harden/ssh/known_hosts}"
+if [ ! -f "${KNOWN_HOSTS_FILE}" ] && [ -f "/tmp/opencode/gs101/issue4/known_hosts" ]; then
+    KNOWN_HOSTS_FILE="/tmp/opencode/gs101/issue4/known_hosts"
+fi
+
+SSH_OPTS="-i ~/.ssh/id_ed25519 -o UserKnownHostsFile=${KNOWN_HOSTS_FILE} -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=3"
 
 echo "=== Google Tensor GS101 (raven) BCM4389 WLAN & Bluetooth Deployment ==="
 echo "Target: ${TARGET_USER}@${TARGET_HOST}"
@@ -27,12 +48,12 @@ fi
 
 echo "[1/4] Copying kernel modules to target /lib/modules/${KERNEL_VER}/extra/ ..."
 ssh $SSH_OPTS "${TARGET_USER}@${TARGET_HOST}" "sudo mkdir -p /lib/modules/${KERNEL_VER}/extra"
-rsync -avz -e "ssh $SSH_OPTS" "${SCRIPT_DIR}/lib/modules/${KERNEL_VER}/extra/" "${TARGET_USER}@${TARGET_HOST}:/tmp/wlan-extra-mods/"
+rsync -avz -e "ssh $SSH_OPTS" "${MODULE_SOURCE_DIR}/"*.ko "${TARGET_USER}@${TARGET_HOST}:/tmp/wlan-extra-mods/"
 ssh $SSH_OPTS "${TARGET_USER}@${TARGET_HOST}" "sudo cp -p /tmp/wlan-extra-mods/*.ko /lib/modules/${KERNEL_VER}/extra/ && sudo rm -rf /tmp/wlan-extra-mods"
 
 echo "[2/4] Copying firmware blobs to target /lib/firmware/ ..."
 ssh $SSH_OPTS "${TARGET_USER}@${TARGET_HOST}" "sudo mkdir -p /lib/firmware/brcm"
-rsync -avz -e "ssh $SSH_OPTS" "${SCRIPT_DIR}/lib/firmware/" "${TARGET_USER}@${TARGET_HOST}:/tmp/wlan-fw/"
+rsync -avz -e "ssh $SSH_OPTS" "${FIRMWARE_SOURCE_DIR}/" "${TARGET_USER}@${TARGET_HOST}:/tmp/wlan-fw/"
 ssh $SSH_OPTS "${TARGET_USER}@${TARGET_HOST}" "sudo cp -rp /tmp/wlan-fw/* /lib/firmware/ && sudo rm -rf /tmp/wlan-fw && sudo chown -R root:root /lib/firmware/bcmdhd* /lib/firmware/fw_bcmdhd* /lib/firmware/google_wifi* /lib/firmware/brcm && sudo chmod 0644 /lib/firmware/bcmdhd* /lib/firmware/fw_bcmdhd* /lib/firmware/google_wifi* /lib/firmware/brcm/*"
 
 echo "[3/4] Updating target module dependency tree (depmod -a) ..."

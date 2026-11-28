@@ -3,9 +3,10 @@
 **Date**: 2026-11-28
 **Scope**: Full component inventory of the consolidated preparation bundle, operational script mapping across post-recovery runbook phases, and verification gates for Issue #10.
 **Consolidated Archive**:
-- **Host Path**: `/tmp/opencode/gs101/artifacts/gs101-prep-bundle-20261128.tar.gz` (5.2 MB)
-- **SHA256**: `88563cccf570bf0781445056178d2aea01f4d6d1f4ddfb8525ae414014ca289f`
-- **Integrity**: Verified with `tar -tzf` and `sha256sum -c gs101-prep-bundle-20261128.tar.gz.sha256`.
+- **Canonical Host Path**: `/home/gregor/phone-second-life-data/mb010/bundles/gs101-prep-bundle-20261128.tar.gz` (5.3 MB, 52 files)
+- **Local Cache Path**: `/tmp/opencode/gs101/artifacts/gs101-prep-bundle-20261128.tar.gz`
+- **SHA256**: `2f7214032c3ffb896a3aaf7d9e5ebf7b8025866900ca543c2b911f2e1ce770d3`
+- **Integrity**: Verified with `tar -tzf` and `sha256sum -c gs101-prep-bundle-20261128.tar.gz.sha256`. See [durable-artifact-layout-20261128.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/durable-artifact-layout-20261128.md).
 
 ---
 
@@ -29,8 +30,8 @@ All kernel modules are built against Linux 7.3 (`7.3.0-rc6-gs101` without `+` su
 | `hci_uart.ko` | `lib/modules/7.3.0-rc6-gs101/extra/` | 216,592 B | `bluetooth`, `btbcm`, `btqca` | HCI UART transport driver with serdev support |
 | `btbcm.ko` | `lib/modules/7.3.0-rc6-gs101/extra/` | 30,976 B | `bluetooth` | Broadcom Bluetooth protocol helper |
 | `btqca.ko` | `lib/modules/7.3.0-rc6-gs101/extra/` | 40,328 B | `bluetooth` | Qualcomm Bluetooth helper |
-| `panfrost.ko` | `cand22/modules/` | 174,448 B | `gpu-sched` | Arm Mali-G78 Bifrost/Valhall GPU driver (`CONFIG_DRM_PANFROST=m`) |
-| `gpu-sched.ko` | `cand22/modules/` | 97,128 B | *None* | DRM GPU scheduler subsystem |
+| `panfrost.ko` | `lib/modules/7.3.0-rc6-gs101/extra/` | 174,448 B | `gpu-sched` | Arm Mali-G78 Bifrost/Valhall GPU driver (`CONFIG_DRM_PANFROST=m`) |
+| `gpu-sched.ko` | `lib/modules/7.3.0-rc6-gs101/extra/` | 97,128 B | *None* | DRM GPU scheduler subsystem |
 
 ### 1.2 Extracted BCM4389 Firmware & NVRAM Calibration (16 Blobs)
 Extracted from Google stock Pixel 6 Pro firmware under `lib/firmware/`:
@@ -42,12 +43,13 @@ Extracted from Google stock Pixel 6 Pro firmware under `lib/firmware/`:
 
 ### 1.3 Versioned Operational Scripts (Repository & Bundle)
 Permanently versioned in repository under [Documentation/gs101/tests/](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/):
-- [install-wlan.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-wlan.sh): Sideloads 8 WLAN/BT modules and 16 firmware blobs, runs `depmod -a`, and executes controlled probe sequence `pci-exynos -> rfkill -> cfg80211 -> bcmdhd -> bluetooth -> hci_uart`.
+- [build-deploy-bundle.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/build-deploy-bundle.sh): Canonical offline builder staging all 10 modules, 16 firmware blobs, scripts, and precomputed `modules.dep` via `depmod -b`, producing the validated tarball.
+- [install-wlan.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-wlan.sh): Sideloads 8 WLAN/BT modules and 16 firmware blobs, runs `depmod -a`, and executes controlled probe sequence `pci-exynos -> rfkill -> cfg80211 -> bcmdhd -> bluetooth -> hci_uart`. Defaults to permanent `/home/gregor/.../mb010/` storage.
 - [unload-wlan.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/unload-wlan.sh): Reverses module insertion in strict dependency order: `hci_uart -> btqca -> btbcm -> bluetooth -> bcmdhd -> cfg80211 -> rfkill -> pci-exynos`.
-- [install-gpu.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-gpu.sh): Sideloads `gpu-sched.ko` and `panfrost.ko` to `/lib/modules/7.3.0-rc6-gs101/extra/`, executes `depmod -a`, loads via `modprobe panfrost`, and writes `/etc/modules-load.d/panfrost.conf` for reboot persistence.
+- [install-gpu.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-gpu.sh): Sideloads `gpu-sched.ko` and `panfrost.ko` to `/lib/modules/7.3.0-rc6-gs101/extra/`, executes `depmod -a`, loads via `modprobe panfrost`, and writes `/etc/modules-load.d/panfrost.conf` for reboot persistence. Defaults to permanent `/home/gregor/.../mb010/` storage.
 - [unload-gpu.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/unload-gpu.sh): Cleans `/etc/modules-load.d/panfrost.conf` and unloads `panfrost` and `gpu_sched`.
-- [install-apps.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-apps.sh): Configures persistent default route (`172.16.42.2 dev usb0`) and DNS (`1.1.1.1` in `systemd-resolved`), and installs minimal application set (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) with offline local depot fallback.
-- [verify-recovery.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/verify-recovery.sh): Host-side acceptance audit gathering system telemetry and emitting JSON evidence. Exits with code `0` only when all checks evaluate to `PASS` or expected `INFO` (`FAIL == 0`).
+- [install-apps.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/install-apps.sh): Configures persistent default route (`172.16.42.2 dev usb0`) and DNS (`1.1.1.1` in `systemd-resolved`), and installs minimal application set (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) with offline local depot fallback (`/home/gregor/phone-second-life-data/mb010/apk-depot/aarch64`).
+- [verify-recovery.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/verify-recovery.sh): Host-side acceptance audit gathering system telemetry and emitting JSON evidence into durable backup `/home/gregor/phone-second-life-data/mb010/artifact-backup`. Exits with code `0` only when all checks evaluate to `PASS` or expected `INFO` (`FAIL == 0`).
 
 ---
 

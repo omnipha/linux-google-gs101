@@ -11,6 +11,7 @@
 - **Current State**: Device remains powered off since 2026-11-26 04:04:28.
 - **Single Flash Writer Rule**: `cand14-rollback.service` (Main PID `1432080`, armed wait until 2026-11-29 00:11:03) is the **sole authorized flash writer** on the host.
 - **Prohibition**: Never execute `fastboot flash`, `flash-cand20.sh`, `flash-cand21.sh`, `flash-cand22.sh`, `flash-cand23.sh`, or any secondary flash utility while `cand14-rollback.service` is active.
+- **Permanent Artifact Roots**: Canonical flash images and deployment bundles are stored under `/home/gregor/phone-second-life-data/mb010/` (documented in [durable-artifact-layout-20261128.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/durable-artifact-layout-20261128.md)). If `/tmp` is empty following a host reboot, run `./Documentation/gs101/tests/build-deploy-bundle.sh` to reconstitute the bundle.
 
 ---
 

@@ -20,6 +20,13 @@ This runbook defines the exact, sequential procedure to execute immediately upon
    done
    ```
 
+3. **Durable Artifact & Bundle Baseline**:
+   All operational modules, images, and tools are preserved in permanent storage under `/home/gregor/phone-second-life-data/mb010/` (see [durable-artifact-layout-20261128.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/durable-artifact-layout-20261128.md)). If `/tmp` was wiped across a host restart, restore operational artifacts via:
+   ```bash
+   ./Documentation/gs101/tests/build-deploy-bundle.sh
+   tar -xzf /home/gregor/phone-second-life-data/mb010/bundles/gs101-prep-bundle-20261128.tar.gz -C /tmp/opencode/gs101/
+   ```
+
 ---
 
 ## Phase 1: SSH Return & Candidate 14 Baseline Verification
