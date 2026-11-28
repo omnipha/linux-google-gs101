@@ -112,7 +112,7 @@ In Android boot header v4, the kernel Device Tree (`DTB`) is delivered by the bo
 - The on-device `vendor_boot_a` (`cand18`, SHA-256 `8a6840fb...`) carries an older DTB (`82ae6a8a...`) that predates the Bluetooth serdev DTS implementation.
 - Flashing `boot_a` alone (`cand20`) leaves the running kernel with the older DTB lacking `usi16: usi@175b00c0` and `serial_16: serial@175b0000`.
 - To enable both GPU Panfrost modular testing (Issue #11) and Bluetooth serdev probing (Issue #8), **Candidate 21** updates both partitions:
-  - `boot_a`: `cand20` `boot.img` (`6ac46d31ba8be2a17fb14d4a6dd6cd406575fc6704666618b8cdb9b31cfecee7`)
+  - `boot_a`: `cand20` `boot.img` (`4c172f54ef5280c3bd63337613fd909f6695ab1d2c777f9913e658f05ca3fcf9`)
   - `vendor_boot_a`: `cand21` `vendor_boot.img` (`43d5252a016b6b77fa4ed6164da097e84c0c2ce23eb9a9cd640e00209599daf4`)
 
 ### Step 3.1: Verify Rollback Unit is Inactive

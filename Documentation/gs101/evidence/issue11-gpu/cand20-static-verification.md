@@ -17,14 +17,15 @@ Both `cand20` and `cand14` `boot.img` files were unpacked using `unpack_bootimg`
 
 | Parameter | cand14 `boot.img` (Baseline) | cand20 `boot.img` (Candidate) | Match / Delta |
 | :--- | :--- | :--- | :--- |
-| **SHA-256 Hash** | `84323d06a8df3b2cdcc9e05ccba802951e123d4cf2bc28ba781358f69020de36` | `6ac46d31ba8be2a17fb14d4a6dd6cd406575fc6704666618b8cdb9b31cfecee7` | Expected delta |
+| **SHA-256 Hash** | `84323d06a8df3b2cdcc9e05ccba802951e123d4cf2bc28ba781358f69020de36` | `4c172f54ef5280c3bd63337613fd909f6695ab1d2c777f9913e658f05ca3fcf9` | Expected delta |
 | **Header Version** | `4` | `4` | Exact match |
 | **Header Magic** | `ANDROID!` | `ANDROID!` | Exact match |
-| **Compressed Kernel Size** | 14,567,524 bytes (14.2 MB) | 14,511,664 bytes (14.1 MB) | -55,860 bytes (Panfrost `=m`) |
+| **Compressed Kernel Size** | 14,567,524 bytes (14.2 MB) | 14,511,885 bytes (14.1 MB) | -55,639 bytes (Panfrost `=m`) |
 | **Ramdisk Size** | `0` | `0` | Exact match (ramdisk in `vendor_boot`) |
 | **OS Version / Patch** | `None` / `None` | `None` / `None` | Exact match |
 | **Boot Image Cmdline** | *(empty)* | *(empty)* | Exact match (cmdline in `vendor_boot`) |
 | **Signature Size** | `0` | `0` | Exact match |
+| **Kernel Release** | `7.3.0-rc6-gs101` | `7.3.0-rc6-gs101` | Exact match (`LOCALVERSION=""`) |
 
 ---
 
@@ -64,8 +65,8 @@ In `cand14` (`CONFIG_DRM_PANFROST=y`), 45 driver strings were compiled directly 
 In `cand20` (`CONFIG_DRM_PANFROST=m`), **zero** Panfrost strings or symbols exist in the kernel image.
 
 All Panfrost functionality is completely isolated into the loadable module artifacts:
-- `/tmp/opencode/gs101/cand20/modules/panfrost.ko` (SHA-256: `c4fd47d6af2515f8d2beda8cba330641fd8c6ebe7de9a7f357247e26bc8c9e11`)
-- `/tmp/opencode/gs101/cand20/modules/gpu-sched.ko` (SHA-256: `0bed842c0526a9e84c912588b1f8efeb17ecf701b9a4a696bae062b5b6cb7c1b`)
+- `/tmp/opencode/gs101/cand20/modules/panfrost.ko` (SHA-256: `562f9bc1f377a3f028182402c61439e128ca9e67efe2ecab8f1196f5e308a5c4`)
+- `/tmp/opencode/gs101/cand20/modules/gpu-sched.ko` (SHA-256: `eb00f25f5f61f9a3b70c6174781bf11878e35e67ec195d664bd6acb0af9967bf`)
 
 ---
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Flash script for Candidate 21: boot_a (cand20) + vendor_boot_a (cand21).
 # Target:
-#   - boot_a: cand20 boot.img with CONFIG_DRM_PANFROST=m (sha: 6ac46d31...)
+#   - boot_a: cand20 boot.img with CONFIG_DRM_PANFROST=m (sha: 4c172f54...)
 #   - vendor_boot_a: cand21 vendor_boot.img with corrected USI16/UART16 DTB (sha: 43d5252a...)
 # Rollback reference:
 #   - boot_a: cand14 boot.img (sha: 84323d06...)
@@ -19,7 +19,7 @@ VENDOR_BOOT_IMG="/tmp/opencode/gs101/cand21/vendor_boot.img"
 ROLLBACK_BOOT="/tmp/opencode/gs101/cand14/boot.img"
 ROLLBACK_VENDOR="/tmp/opencode/gs101/cand18/vendor_boot.img"
 
-EXPECT_CAND20_BOOT="6ac46d31ba8be2a17fb14d4a6dd6cd406575fc6704666618b8cdb9b31cfecee7"
+EXPECT_CAND20_BOOT="4c172f54ef5280c3bd63337613fd909f6695ab1d2c777f9913e658f05ca3fcf9"
 EXPECT_CAND21_VENDOR="43d5252a016b6b77fa4ed6164da097e84c0c2ce23eb9a9cd640e00209599daf4"
 EXPECT_ROLLBACK_BOOT="84323d06a8df3b2cdcc9e05ccba802951e123d4cf2bc28ba781358f69020de36"
 EXPECT_ROLLBACK_VENDOR="8a6840fbbc2035862a46123f5b25539d1085903a16d38a8904bb2966142ac818"
