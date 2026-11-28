@@ -85,7 +85,6 @@
 		nvmem: anchor-nvmem { };
 		odm: anchor-odm { };
 		pcie_0: anchor-pcie_0 { };
-		pcie_1: anchor-pcie_1 { };
 		pdma0: anchor-pdma0 { };
 		pinctrl_0: anchor-pinctrl_0 { };
 		pinctrl_1: anchor-pinctrl_1 { };

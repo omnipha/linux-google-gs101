@@ -581,7 +581,7 @@
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
-		ranges = <0x0 0x0 0x0 0x40000000>;
+		ranges = <0x0 0x0 0x0 0x80000000>;
 
 		efuse@10000000 {
 			compatible = "google,gs101-otp";
@@ -1752,6 +1752,50 @@
 			clocks = <&cmu_hsi2 CLK_GOUT_HSI2_GPIO_HSI2_PCLK>;
 			clock-names = "pclk";
 			interrupts = <GIC_SPI 503 IRQ_TYPE_LEVEL_HIGH 0>;
+		};
+
+		pcie_1: pcie@14520000 {
+			compatible = "google,gs101-pcie",
+				     "samsung,exynos-pcie-rc",
+				     "samsung,exynos5433-pcie",
+				     "snps,dw-pcie";
+			reg = <0x14520000 0x2000>,
+			      <0x14550000 0x2000>,
+			      <0x14420000 0x2000>,
+			      <0x14800000 0x301000>,
+			      <0x14540000 0x1000>,
+			      <0x60ffe000 0x2000>,
+			      <0x14500000 0x1000>;
+			reg-names = "elbi", "phy", "sysreg", "dbi", "pcs", "config", "ia";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			device_type = "pci";
+			bus-range = <0x00 0xff>;
+			ranges = <0x82000000 0x0 0x60000000 0x60000000 0x0 0xff0000>;
+			num-lanes = <1>;
+			max-link-speed = <2>;
+
+			interrupts = <GIC_SPI 509 IRQ_TYPE_LEVEL_HIGH 0>;
+			interrupt-names = "msi";
+			#interrupt-cells = <1>;
+			interrupt-map-mask = <0 0 0 0>;
+			interrupt-map = <0 0 0 0 &gic GIC_SPI 509 IRQ_TYPE_LEVEL_HIGH 0>;
+
+			clocks = <&cmu_hsi2 CLK_GOUT_HSI2_PCIE_GEN4_1_PCIE_003_DBI_ACLK_UG>,
+				 <&cmu_hsi2 CLK_GOUT_HSI2_PCIE_GEN4_1_PCIE_003_MSTR_ACLK_UG>,
+				 <&cmu_hsi2 CLK_GOUT_HSI2_PCIE_GEN4_1_PCIE_003_SLV_ACLK_UG>,
+				 <&cmu_hsi2 CLK_GOUT_HSI2_PCIE_GEN4_1_PCIE_003_I_DRIVER_APB_CLK>,
+				 <&cmu_hsi2 CLK_GOUT_HSI2_PCIE_GEN4_1_PCIE_003_PHY_REFCLK_IN>,
+				 <&cmu_hsi2 CLK_MOUT_HSI2_PCIE_USER>;
+			clock-names = "pcie", "pcie_bus", "slv", "apb", "ref", "user";
+
+			samsung,sysreg = <&sysreg_hsi2>;
+			samsung,pmu-syscon = <&pmu_system_controller>;
+			samsung,syscon-phandle = <&pmu_system_controller>;
+			pmu-offset = <0x3ec4>;
+			ch-num = <1>;
+
+			status = "disabled";
 		};
 
 		ufs_0: ufs@14700000 {

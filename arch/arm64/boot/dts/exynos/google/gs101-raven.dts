@@ -174,3 +174,25 @@
 		max-speed = <3000000>;
 	};
 };
+
+&pcie_1 {
+	pinctrl-0 = <&pcie1_clkreq &pcie1_perst>;
+	pinctrl-names = "default";
+	reset-gpios = <&gph2 0 GPIO_ACTIVE_LOW>;
+	vdd085-supply = <&ldo17m>;
+	vdd18-supply = <&ldo19m>;
+	vdd10-supply = <&ldo17m>;
+	vreg1-supply = <&ldo17m>;
+	vreg2-supply = <&ldo19m>;
+	status = "okay";
+
+	wlan: wifi@0,0 {
+		compatible = "android,bcmdhd_wlan", "pci14e4,4389";
+		reg = <0x0000 0 0 0 0>;
+		wl_reg_on = <&gpp14 2 GPIO_ACTIVE_HIGH>;
+		wl_host_wake = <&gpa7 0 GPIO_ACTIVE_HIGH>;
+		wl_dev_wake = <&gph2 5 GPIO_ACTIVE_HIGH>;
+		ch-num = <1>;
+		status = "okay";
+	};
+};

@@ -356,25 +356,25 @@
 				regulator-always-on;
 			};
 
-			ldo16m {
+			ldo16m: ldo16m {
 				regulator-name = "vdd085_pcie0";
 				regulator-min-microvolt = <725000>;
 				regulator-max-microvolt = <1300000>;
 			};
 
-			ldo17m {
+			ldo17m: ldo17m {
 				regulator-name = "vdd085_pcie1";
 				regulator-min-microvolt = <725000>;
 				regulator-max-microvolt = <1300000>;
 			};
 
-			ldo18m {
+			ldo18m: ldo18m {
 				regulator-name = "vdd18_pcie0";
 				regulator-min-microvolt = <1600000>;
 				regulator-max-microvolt = <1950000>;
 			};
 
-			ldo19m {
+			ldo19m: ldo19m {
 				regulator-name = "vdd18_pcie1";
 				regulator-min-microvolt = <1600000>;
 				regulator-max-microvolt = <1950000>;
