@@ -107,6 +107,25 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 
 **Precondition**: Execute ONLY AFTER Phase 2 live module test completes and supervisor authorizes kernel/vendor flash.
 
+> [!IMPORTANT]
+> **Phase 3 GPU Userspace Validation Note (Issue #11 Panfrost Proof)**:
+> After Panfrost probing (confirming `/dev/dri/renderD128` exists), install the Gallium3D driver and verification utilities from the offline APK depot (`/tmp/apk-depot`):
+> ```bash
+> sudo apk add --allow-untrusted --repository /tmp/apk-depot \
+>     mesa-dri-gallium mesa-utils mesa-demos
+> ```
+> Execute proof commands on target:
+> 1. Verify OpenGL/EGL renderer string:
+>    ```bash
+>    eglinfo -B | grep -E "(OpenGL vendor|OpenGL renderer|OpenGL version)"
+>    ```
+>    *Required evidence*: `renderD128` bound to `Mali-G78 (Panfrost)`.
+> 2. Execute Wayland GLES2 test:
+>    ```bash
+>    WAYLAND_DISPLAY=wayland-0 es2gears_wayland
+>    ```
+> Without `mesa-dri-gallium` (`/usr/lib/dri/panfrost_dri.so`), `WLR_RENDERER=gles2` in Phoc will fail or fall back to software rendering (`llvmpipe`), regardless of `panfrost.ko` loading cleanly.
+
 ### Why `vendor_boot` Flash is Required for Bluetooth (Issue #8)
 In Android boot header v4, the kernel Device Tree (`DTB`) is delivered by the bootloader from the `vendor_boot` partition (`dtb` region), **not** from `boot.img`.
 - The on-device `vendor_boot_a` (`cand18`, SHA-256 `8a6840fb...`) carries an older DTB (`82ae6a8a...`) that predates the Bluetooth serdev DTS implementation.
