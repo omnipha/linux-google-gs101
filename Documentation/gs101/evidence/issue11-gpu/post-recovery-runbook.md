@@ -36,7 +36,7 @@ Execute on device over SSH:
 ```bash
 # 1. Kernel version
 uname -a
-# Expected: Linux postmarketos 7.3.0-rc6-gs101+ #14 SMP PREEMPT ... aarch64
+# Expected: Linux postmarketos 7.3.0-rc6-gs101 #14 SMP PREEMPT ... aarch64
 
 # 2. Command line and console verification
 cat /proc/cmdline
@@ -172,6 +172,8 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 ---
 
 ## Phase 5: Issue #10 Application Minimal Set & Persistence Verification
+
+*Hinweis zu Modulpfaden*: Nach Umsetzung von Variante A lautet `uname -r` exakt `7.3.0-rc6-gs101` (ohne Plus). Alle systemweiten Modulpfade in den Befehlszeilen und kmod/modprobe-Konfigurationen zeigen daher auf `/usr/lib/modules/7.3.0-rc6-gs101/` (ohne Plus), damit Phase 5 und systemd-Dienste nicht ins Leere laufen.
 
 Once GPU acceleration is verified:
 1. Verify reboot persistence of network routing (default via `172.16.42.2`) and DNS (`1.1.1.1`).

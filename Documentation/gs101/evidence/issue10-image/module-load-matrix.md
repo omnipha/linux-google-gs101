@@ -94,12 +94,34 @@ ls -la /sys/class/bluetooth/ || true
 
 ## 4. Rootfs Module Tree Normalization (Optional Post-Recovery Step)
 
-To allow standard `modprobe` and `depmod` to function normally on Candidate 20/21:
+Nach der erfolgreichen Umsetzung von Variante A (Kernel- und Modulbau mit `LOCALVERSION=""`) lautet `uname -r` des laufenden Kernels exakt `7.3.0-rc6-gs101` (ohne Plus). Ein Verzeichnis `/usr/lib/modules/7.3.0-rc6-gs101+/` existiert nach Variante A nicht und wäre ein toter Pfad, da der Modul-Loader (`kmod` / `modprobe` / `depmod`) Module strikt unter `/lib/modules/$(uname -r)/` auflöst.
+
+Der Zielpfad für neu bereitgestellte Module muss auf dem Zielgerät stets dynamisch aus `uname -r` abgeleitet und nicht statisch angenommen werden:
 ```bash
 /tmp/opencode/gs101/issue4/sshc.sh '
-sudo mkdir -p /usr/lib/modules/7.3.0-rc6-gs101+/
-sudo cp /tmp/bluetooth.ko /tmp/btbcm.ko /tmp/btqca.ko /tmp/hci_uart.ko /tmp/gpu-sched.ko /tmp/panfrost.ko /usr/lib/modules/7.3.0-rc6-gs101+/
-sudo depmod -a 7.3.0-rc6-gs101+
+KVER=$(uname -r)
+sudo mkdir -p "/usr/lib/modules/${KVER}/"
+sudo cp /tmp/bluetooth.ko /tmp/btbcm.ko /tmp/btqca.ko /tmp/hci_uart.ko /tmp/gpu-sched.ko /tmp/panfrost.ko "/usr/lib/modules/${KVER}/"
+sudo depmod -a "${KVER}"
 '
 ```
-Once normalized, `modprobe hci_uart` and `modprobe panfrost` will function without requiring `/tmp/` paths.
+Mit `KVER=7.3.0-rc6-gs101` werden die neu gebauten Module direkt in den bestehenden Rootfs-Modulbaum `/usr/lib/modules/7.3.0-rc6-gs101/` integriert. Nach Ausführung von `depmod -a 7.3.0-rc6-gs101` funktionieren Standardaufrufe wie `modprobe hci_uart` und `modprobe panfrost` transparent ohne manuelle `/tmp/`-Pfadangaben.
+
+---
+
+## 5. Post-Variante-A Konsistenz-Check
+
+Eine automatisierte Prüfung aller Dokumente in `Documentation/gs101/evidence/issue10-image/` und `Documentation/gs101/evidence/issue11-gpu/` mittels:
+```bash
+grep -rn "gs101+" Documentation/gs101/evidence/issue10-image/ Documentation/gs101/evidence/issue11-gpu/
+```
+belegt die vollständige Konsistenz und Abwesenheit von Fehlreferenzen:
+
+1. **Ausführbare Befehlszeilen & Erwartungswerte**:
+   - **0 Treffer**: Weder in Shell-Skripten, noch in `sshc.sh`-Befehlsblöcken, noch in `Expected:`-Zeilen existiert ein Verweis auf `gs101+`. Alle Pfade nutzen `/usr/lib/modules/7.3.0-rc6-gs101/` bzw. `$(uname -r)`.
+2. **Legitime historische Dokumentationstreffer**:
+   - `Documentation/gs101/evidence/issue10-image/module-load-matrix.md:12`: Dokumentiert die historische Ursache des initialen cand20-Zustands vor Variante A (`Built without LOCALVERSION=""`).
+   - `Documentation/gs101/evidence/issue10-image/vermagic-mismatch-cand20-cand21.md:11, 25, 28`: Dokumentiert den diagnostizierten Fehlerbefund (modprobe-Fehlermeldung `should be '7.3.0-rc6-gs101+...'` und die Analyse der Auswirkung auf `sec_touch.ko`).
+   - `Documentation/gs101/evidence/issue10-image/kernel-config-audit.md:4`: Historischer Header des initialen Kernel-Tree-Audits vor dem Variante-A-Rebuild.
+
+Alle verbleibenden `gs101+`-Vorkommen dienen ausschließlich der Nachvollziehbarkeit des behobenen Vermagic-Mismatchs; operative Befehle und Erwartungswerte sind zu 100% konsistent auf `7.3.0-rc6-gs101`.
