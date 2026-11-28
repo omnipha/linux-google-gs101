@@ -140,3 +140,77 @@ scp user@172.16.42.1:/tmp/phosh_touch_result.png Documentation/gs101/evidence/is
 | **Slot Allocation** | Active finger assigned cleanly to `ABS_MT_SLOT 0`; unique tracking ID allocated and retired cleanly (`-1`). | Slot ID flapping, missing `SYN_REPORT`, or tracking ID leaks. |
 | **Motion Tracking** | Smooth monotonic decrease in `ABS_MT_POSITION_Y` ($3000 \to 1500$) without sudden jumps. | Touch coordinates erratic or jumping randomly between slots. |
 | **Compositor Reaction** | Phosh shell immediately executes unlock or overview animation. | Compositor ignores gesture due to contradictory tool state. |
+
+---
+
+## 6. Controlled Multitouch Test Suite Integration (`touchmt-test.sh`)
+
+In addition to manual gesture feel, the automated [touchmt-test.sh](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/tests/touchmt-test.sh) script provides objective statistical measurement across all touch dimensions.
+
+### 6.1 Step-by-Step Test Procedure for the Owner
+
+Execute the test suite via SSH on the host while holding the phone:
+
+```bash
+# Sideload and execute full test suite on device
+ssh user@172.16.42.1 'sudo touchmt-test.sh all --output /tmp/touchmt-owner.tsv'
+```
+
+Alternatively, individual modules can be executed step-by-step:
+
+1. **Step A: 9-Point Calibration Grid Tap (`grid9`)**:
+   - Command:
+     ```bash
+     ssh user@172.16.42.1 'sudo touchmt-test.sh grid9 --output /tmp/touchmt-grid9.tsv'
+     ```
+   - *Action*: The script prompts for 9 sequential points on the $1440 \times 3120$ panel (Top-Left, Top-Center, Top-Right, Mid-Left, Center, Mid-Right, Bottom-Left, Bottom-Center, Bottom-Right) with a 4-second pause per point. Tap each point with a single finger.
+   - *Recorded Metric*: `DOWN` event coordinates ($X, Y$ in px and mm), `major`, `minor`, `pressure`.
+
+2. **Step B: 1-Finger Drag & Report Rate (`drag`)**:
+   - Command:
+     ```bash
+     ssh user@172.16.42.1 'sudo touchmt-test.sh drag --output /tmp/touchmt-drag.tsv'
+     ```
+   - *Action*: Swipe smoothly horizontally across the display, then vertically for 10 seconds.
+   - *Recorded Metric*: Inter-event cadence ($\Delta t$ in ms), report frequency ($\text{Hz}$), and cadence jitter standard deviation.
+
+3. **Step C: Stationary Long-Press Stability (`longpress`)**:
+   - Command:
+     ```bash
+     ssh user@172.16.42.1 'sudo touchmt-test.sh longpress --duration 10 --output /tmp/touchmt-lp.tsv'
+     ```
+   - *Action*: Hold a single finger firmly in the center of the screen for 10 seconds without lifting.
+   - *Recorded Metric*: Positional jitter standard deviations $\sigma_x, \sigma_y$ (in px and mm) and contact drop check.
+
+4. **Step D: 2-Finger Pinch / Zoom Tracking (`pinch`)**:
+   - Command:
+     ```bash
+     ssh user@172.16.42.1 'sudo touchmt-test.sh pinch --output /tmp/touchmt-pinch.tsv'
+     ```
+   - *Action*: Place two fingers on the screen and perform pinch-in and pinch-out gestures for 10 seconds.
+   - *Recorded Metric*: Multi-touch slot concurrency (`ABS_MT_SLOT` 0 and 1 active simultaneously).
+
+5. **Step E: 5-Minute Ghost Touch Monitor (`ghost`)**:
+   - Command:
+     ```bash
+     ssh user@172.16.42.1 'sudo touchmt-test.sh ghost --duration 300 --output /tmp/touchmt-ghost.tsv'
+     ```
+   - *Action*: Place the phone on a flat surface and **do not touch the screen** for 5 minutes (300 s).
+   - *Recorded Metric*: Count of spurious touch events (must be strictly `0`).
+
+---
+
+### 6.2 Key Summary Figures to Inspect / Document
+
+Following test completion, the script runs its embedded analyzer and displays the summary report (also written to `/tmp/<output>.summary.txt`):
+
+```bash
+ssh user@172.16.42.1 'touchmt-test.sh analyze /tmp/touchmt-owner.tsv'
+```
+
+The owner/tester reads and documents these exact values from the output report:
+1. **Grid Taps**: Individual tap coordinates ($X, Y$ px and mm), Major/Minor ellipse size, Pressure.
+2. **Mean Cadence & Frequency**: Mean inter-event time in ms (e.g. `8.00 ms (~125.0 Hz)`) and `Cadence Jitter StdDev` in ms.
+3. **Positional Jitter**: Long-press jitter values `sigma_x` and `sigma_y` in pixels and mm.
+4. **Concurrent Slots Active**: List of active hardware slots (must show `[0, 1]` for pinch).
+5. **Spurious Ghost Events**: Total count of ghost touches during idle hold (must report `0 ghost contacts`).
