@@ -1,7 +1,7 @@
 # Issue #10 / #11: Durable Host Storage Hierarchy & Artifact Layout (2026-11-28)
 
-**Date**: 2026-11-28  
-**Scope**: Host-level durable storage hierarchy under `/home/gregor/phone-second-life-data/mb010/`, cryptographic verification table, environment override mapping, and post-reboot reconstitution procedure.  
+**Date**: 2026-11-28
+**Scope**: Host-level durable storage hierarchy under `/home/gregor/phone-second-life-data/mb010/`, cryptographic verification table, environment override mapping, and post-reboot reconstitution procedure.
 **Rule Compliance**: strictly offline documentation and artifact mapping. Zero kernel builds, no flash/reboot operations.
 
 ---
