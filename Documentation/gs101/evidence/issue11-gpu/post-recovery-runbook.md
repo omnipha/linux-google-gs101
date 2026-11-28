@@ -103,9 +103,17 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 
 ---
 
-## Phase 3: Candidate 20 Kernel Flash (Supervisor Authorized)
+## Phase 3: Candidate 20/21 Flash Execution (Supervisor Authorized)
 
-**Precondition**: Execute ONLY AFTER Phase 2 live module test completes and supervisor authorizes kernel flash.
+**Precondition**: Execute ONLY AFTER Phase 2 live module test completes and supervisor authorizes kernel/vendor flash.
+
+### Why `vendor_boot` Flash is Required for Bluetooth (Issue #8)
+In Android boot header v4, the kernel Device Tree (`DTB`) is delivered by the bootloader from the `vendor_boot` partition (`dtb` region), **not** from `boot.img`.
+- The on-device `vendor_boot_a` (`cand18`, SHA-256 `8a6840fb...`) carries an older DTB (`82ae6a8a...`) that predates the Bluetooth serdev DTS implementation.
+- Flashing `boot_a` alone (`cand20`) leaves the running kernel with the older DTB lacking `usi16: usi@175b00c0` and `serial_16: serial@175b0000`.
+- To enable both GPU Panfrost modular testing (Issue #11) and Bluetooth serdev probing (Issue #8), **Candidate 21** updates both partitions:
+  - `boot_a`: `cand20` `boot.img` (`6ac46d31ba8be2a17fb14d4a6dd6cd406575fc6704666618b8cdb9b31cfecee7`)
+  - `vendor_boot_a`: `cand21` `vendor_boot.img` (`43d5252a016b6b77fa4ed6164da097e84c0c2ce23eb9a9cd640e00209599daf4`)
 
 ### Step 3.1: Verify Rollback Unit is Inactive
 Ensure `cand14-rollback.service` is no longer active:
@@ -114,14 +122,15 @@ systemctl --user is-active cand14-rollback.service
 # Must be 'inactive' or 'failed' (completed), NOT running.
 ```
 
-### Step 3.2: Execute Candidate 20 Flash Script
+### Step 3.2: Execute Candidate 21 Flash Script
 Run the prepared single-shot flash script:
 ```bash
-/tmp/opencode/gs101/flash-cand20.sh
+/tmp/opencode/gs101/flash-cand21.sh
 ```
-- Flashes `cand20` `boot.img` (SHA-256: `6ac46d31ba8be2a17fb14d4a6dd6cd406575fc6704666618b8cdb9b31cfecee7`).
-- Reboots device into Candidate 20.
-- Structured JSON output written to `/tmp/opencode/gs101/evidence/flash-cand20-*.json`.
+- Flashes `cand20` `boot_a` + `cand21` `vendor_boot_a`.
+- Reboots device into Candidate 21.
+- Structured JSON output written to `/tmp/opencode/gs101/evidence/flash-cand21-*.json`.
+- *(Alternative for isolated GPU test only)*: `/tmp/opencode/gs101/flash-cand20.sh` (flashes only `boot_a`).
 
 ---
 

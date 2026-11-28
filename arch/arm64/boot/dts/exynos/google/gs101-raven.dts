@@ -152,6 +152,12 @@
 	status = "okay";
 };
 
+&usi16 {
+	samsung,mode = <USI_MODE_UART>;
+	samsung,clkreq-on;
+	status = "okay";
+};
+
 &serial_16 {
 	status = "okay";
 	pinctrl-0 = <&uart16_bus>;
