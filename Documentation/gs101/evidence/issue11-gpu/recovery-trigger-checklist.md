@@ -28,6 +28,7 @@ flowchart TD
     F -->|Active| G["WAIT: Do not touch flash. Wait for unit termination."]
     F -->|Inactive / Failed| H["Step 5: Execute Phase 2 (Live Panfrost Module Test)"]
     H --> I["Step 6: Execute Phase 3 (flash-cand23.sh boot_a + vendor_boot_a)"]
+    I --> J["Step 7: Execute verify-recovery.sh (FAIL == 0)"]
 ```
 
 ### Step 1: Detect Host USB CDC-NCM Network Interface (`enx*`)
@@ -73,3 +74,11 @@ Only after Phase 2 confirms zero kernel panics and valid G78 detection:
 /tmp/opencode/gs101/flash-cand23.sh
 ```
 Consolidated path: flashes `boot_a` (`cand22` modular Panfrost + `CONFIG_PCI_EXYNOS=m`) and `vendor_boot_a` (`cand23` with PCIe RC1 `pcie@14520000` + USI16/UART16 BT DTB). This covers both Issue #11 (GPU) and Issue #8 (WLAN/BT) in a single flash step. *(Note: `flash-cand20.sh` and `flash-cand21.sh` remain available as isolation/fallback paths if isolated GPU-only or BT-only DTB testing is required)*. Followed by Phase 4 (Boot Verification) and Phase 5 (Issue #10 Application Persistence).
+
+### Step 7: Acceptance Verification (`verify-recovery.sh, alle FAIL==0`)
+Following Candidate 23 flash, persistent GPU module activation (`install-gpu.sh`), and application staging (`install-apps.sh`), run the consolidated host-side acceptance test:
+```bash
+/tmp/opencode/gs101/verify-recovery.sh
+```
+- **Prerequisite for acceptance**: Script must complete with zero failures (`FAIL == 0`).
+- Generates structured audit evidence at `/tmp/opencode/gs101/evidence/verify-recovery-<timestamp>.json` confirming *Flash != Boot != Bild != Touch != GPU != Apps*.

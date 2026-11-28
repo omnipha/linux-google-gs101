@@ -218,6 +218,32 @@ After target reboot, verify persistence of the GPU driver stack and core network
 3. Verify reboot persistence of network routing (default via `172.16.42.2`) and DNS (`1.1.1.1`).
 
 ### Step 5.2: Application Deployment & Inventory
-1. Verify pre-installed applications (`lxterminal`, `foot`).
-2. Install file manager (`pcmanfm`) and calculator (`gnome-calculator` / PMOS alternative) via `apk` from local depot `/home/gregor/phone-second-life-data/mb010/apk-depot/aarch64/`.
-3. Document full application inventory and reboot persistence state in `Documentation/gs101/evidence/issue10-image/`.
+Execute `/tmp/opencode/gs101/wlan-bundle/install-apps.sh` to configure persistent network routing (`172.16.42.2 dev usb0`), persistent DNS (`1.1.1.1`), and install the minimal application set (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) with automatic offline sideload fallback from the local depot:
+```bash
+/tmp/opencode/gs101/wlan-bundle/install-apps.sh
+```
+- *(Fallback: manual copy-paste heredoc commands per [app-availability.md §3.1-§3.2](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/app-availability.md))*.
+- Verify package registration via `apk info -e` and binary presence via `which`.
+- Document full application inventory and reboot persistence state in `Documentation/gs101/evidence/issue10-image/`.
+
+---
+
+## Phase 6: Acceptance & Evidence Verification
+
+Following Candidate 23 flash, boot verification, GPU acceleration, and application deployment, execute the consolidated host-side acceptance test:
+
+```bash
+/tmp/opencode/gs101/verify-recovery.sh
+```
+
+### Acceptance Matrix & Evidence Capture
+This single-shot verification enforces the repository policy (*Flash != Boot != Bild != Touch != GPU != Apps*):
+1. **Kernel Release**: `uname -r` is strictly `7.3.0-rc6-gs101` (without `+`).
+2. **Display & Console**: `console=tty0` in `/proc/cmdline`, `tty0` active in `/proc/consoles`, `/dev/fb0` present, and `/sys/class/backlight` empty (consistent with `simpledrm` per `raven-display-console.md`).
+3. **Touchscreen**: `/dev/input/event1` (`sec_touchscreen`) registered and IRQ counter delta monitored over 3 seconds (`0 = INFO kein Finger`).
+4. **GPU Acceleration**: `/dev/dri/renderD128` present, dmesg detects Mali G78 (no `mali-unknown`), and `eglinfo -B` confirms hardware rendering.
+5. **Visual Evidence**: Screen capture via `grim` produces valid image (> 1000 bytes) proving visible rendering.
+6. **Network & DNS Persistence**: Default route via `172.16.42.2` and DNS `1.1.1.1` in `systemd-resolved`.
+7. **Application Set**: All 5 core applications (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) verified.
+8. **Evidence Output**: Writes structured audit JSON to `/tmp/opencode/gs101/evidence/verify-recovery-<timestamp>.json`.
+9. **Final Gate**: Target passes acceptance only when all checks evaluate to `PASS` or expected `INFO` with zero failures (`FAIL == 0`).
