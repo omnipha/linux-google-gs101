@@ -1870,6 +1870,19 @@
 			};
 		};
 
+		serial_16: serial@175b0000 {
+			compatible = "samsung,exynos850-uart";
+			reg = <0x175b0000 0x100>;
+			clocks = <&cmu_apm CLK_GOUT_APM_APM_USI1_UART_PCLK>,
+				 <&cmu_apm CLK_GOUT_APM_APM_USI1_UART_IPCLK>,
+				 <&cmu_apm CLK_GOUT_APM_CLK_APM_USI1_UART_CLK>;
+			clock-names = "uart", "clk_uart_baud0", "clk_uart_baud1";
+			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH 0>;
+			pinctrl-0 = <&uart16_bus>;
+			pinctrl-names = "default";
+			status = "disabled";
+		};
+
 		ap2apm_mailbox: mailbox@17610000 {
 			compatible = "google,gs101-mbox";
 			reg = <0x17610000 0x1000>;

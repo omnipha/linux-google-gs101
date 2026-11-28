@@ -151,3 +151,20 @@
 	samsung,mode = <USI_MODE_SPI>;
 	status = "okay";
 };
+
+&serial_16 {
+	status = "okay";
+	pinctrl-0 = <&uart16_bus>;
+	pinctrl-names = "default";
+
+	bluetooth {
+		compatible = "brcm,bcm4349-bt", "brcm,bcm43438-bt";
+		shutdown-gpios = <&gpp16 2 GPIO_ACTIVE_HIGH>;
+		device-wakeup-gpios = <&gpp14 3 GPIO_ACTIVE_HIGH>;
+		host-wakeup-gpios = <&gpa6 6 GPIO_ACTIVE_HIGH>;
+		interrupt-parent = <&gpa6>;
+		interrupts = <6 IRQ_TYPE_EDGE_RISING>;
+		interrupt-names = "host-wakeup";
+		max-speed = <3000000>;
+	};
+};

@@ -95,7 +95,6 @@
 		pinctrl_7: anchor-pinctrl_7 { };
 		regulators: anchor-regulators { };
 		s2mpu_hsi1: anchor-s2mpu_hsi1 { };
-		serial_16: anchor-serial_16 { };
 		spi_11: anchor-spi_11 { };
 		ss_tune_param: anchor-ss_tune_param { };
 		sub_pd_hsi0: anchor-sub_pd_hsi0 { };
