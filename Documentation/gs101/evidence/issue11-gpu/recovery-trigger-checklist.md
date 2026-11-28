@@ -27,7 +27,7 @@ flowchart TD
     E --> F{"Step 4: Verify cand14-rollback.service Status"}
     F -->|Active| G["WAIT: Do not touch flash. Wait for unit termination."]
     F -->|Inactive / Failed| H["Step 5: Execute Phase 2 (Live Panfrost Module Test)"]
-    H --> I["Step 6: Execute Phase 3 (flash-cand20.sh boot_a)"]
+    H --> I["Step 6: Execute Phase 3 (flash-cand21.sh boot_a + vendor_boot_a)"]
 ```
 
 ### Step 1: Detect Host USB CDC-NCM Network Interface (`enx*`)
@@ -67,9 +67,9 @@ Once Steps 1–4 pass:
 2. Load modules with `sudo insmod`.
 3. Verify `/dev/dri/renderD128` and evaluate `dmesg`.
 
-### Step 6: Execute Phase 3 (`flash-cand20.sh`)
+### Step 6: Execute Phase 3 (`flash-cand21.sh`)
 Only after Phase 2 confirms zero kernel panics and valid G78 detection:
 ```bash
-/tmp/opencode/gs101/flash-cand20.sh
+/tmp/opencode/gs101/flash-cand21.sh
 ```
-Followed by Phase 4 (Boot Verification) and Phase 5 (Issue #10 Application Persistence).
+Flashes `boot_a` (`cand20` modular Panfrost) and `vendor_boot_a` (`cand21` corrected USI16/UART16 BT DTB). *(Note: `/tmp/opencode/gs101/flash-cand20.sh` remains available if GPU-only isolation without DTB update is requested)*. Followed by Phase 4 (Boot Verification) and Phase 5 (Issue #10 Application Persistence).

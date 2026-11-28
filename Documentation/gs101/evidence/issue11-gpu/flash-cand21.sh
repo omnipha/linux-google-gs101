@@ -80,6 +80,16 @@ echo "cand21 vendor:    $ACT_CAND21_VENDOR  $VENDOR_BOOT_IMG"
 echo "rollback boot:    $ACT_ROLLBACK_BOOT  $ROLLBACK_BOOT"
 echo "rollback vendor:  $ACT_ROLLBACK_VENDOR  $ROLLBACK_VENDOR"
 
+echo "--- checking SSH connectivity to reboot to bootloader ---"
+if ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
+       -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=2 \
+       user@172.16.42.1 'echo ONLINE' >/dev/null 2>&1; then
+    echo "SSH reachable: requesting reboot to bootloader..."
+    /tmp/opencode/gs101/issue4/sshc.sh 'sudo reboot bootloader' || true
+else
+    echo "SSH not reachable (device may already be in fastboot mode), skipping reboot command."
+fi
+
 echo "Waiting for fastboot device (single shot, max 30s)..."
 DEV=""
 for i in $(seq 1 30); do
