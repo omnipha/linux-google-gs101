@@ -164,12 +164,18 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 ```
 - Confirm kernel boots cleanly on `simpledrm` with zero Panfrost early-boot involvement.
 
-### Step 4.2: Load Panfrost Modules
+### Step 4.2: Load Panfrost Modules & Establish Persistence
+Execute `/tmp/opencode/gs101/wlan-bundle/install-gpu.sh` to copy `gpu-sched.ko` and `panfrost.ko` to `/lib/modules/7.3.0-rc6-gs101/extra/`, update dependencies via `depmod -a`, load via `modprobe panfrost`, and configure reboot persistence via `/etc/modules-load.d/panfrost.conf`:
 ```bash
-ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
-    user@172.16.42.1 'sudo insmod /tmp/gpu-sched.ko && sudo insmod /tmp/panfrost.ko'
+/tmp/opencode/gs101/wlan-bundle/install-gpu.sh
 ```
-- Verify `/dev/dri/renderD128` exists.
+- Verify `/dev/dri/renderD128` exists, dmesg shows Mali G78 model detection (not `mali-unknown`), and no kernel oops/panic occurs.
+- *(Fallback for isolated runtime testing only)*:
+  ```bash
+  ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
+      user@172.16.42.1 'sudo insmod /tmp/gpu-sched.ko && sudo insmod /tmp/panfrost.ko'
+  ```
+  *(Note: `insmod /tmp` does not survive reboots or register modules in kmod dependency indexes).*
 
 ### Step 4.3: Test Phoc Hardware Acceleration (`WLR_RENDERER=gles2`)
 1. Configure Phoc renderer override:
@@ -196,8 +202,22 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 
 *Hinweis zu Modulpfaden*: Nach Umsetzung von Variante A lautet `uname -r` exakt `7.3.0-rc6-gs101` (ohne Plus). Alle systemweiten Modulpfade in den Befehlszeilen und kmod/modprobe-Konfigurationen zeigen daher auf `/usr/lib/modules/7.3.0-rc6-gs101/` (ohne Plus), damit Phase 5 und systemd-Dienste nicht ins Leere laufen.
 
-Once GPU acceleration is verified:
-1. Verify reboot persistence of network routing (default via `172.16.42.2`) and DNS (`1.1.1.1`).
-2. Verify pre-installed applications (`lxterminal`, `foot`).
-3. Install file manager (`pcmanfm`) and calculator (`gnome-calculator` / PMOS alternative) via `apk`.
-4. Document full application inventory and reboot persistence state in `Documentation/gs101/evidence/issue10-image/`.
+### Step 5.1: GPU & Core Service Reboot Persistence Verification
+After target reboot, verify persistence of the GPU driver stack and core network configuration before application testing:
+1. Confirm `/dev/dri/renderD128` was automatically created on boot via `/etc/modules-load.d/panfrost.conf`:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
+       user@172.16.42.1 'ls -la /dev/dri/renderD128 && cat /etc/modules-load.d/panfrost.conf'
+   ```
+2. Confirm OpenGL hardware acceleration provider:
+   ```bash
+   ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
+       user@172.16.42.1 'eglinfo | grep -iE "opengl|renderer|panfrost"'
+   ```
+   *(Must output Panfrost Mali-G78 renderer string, not `llvmpipe` or software rasterizer).*
+3. Verify reboot persistence of network routing (default via `172.16.42.2`) and DNS (`1.1.1.1`).
+
+### Step 5.2: Application Deployment & Inventory
+1. Verify pre-installed applications (`lxterminal`, `foot`).
+2. Install file manager (`pcmanfm`) and calculator (`gnome-calculator` / PMOS alternative) via `apk` from local depot `/home/gregor/phone-second-life-data/mb010/apk-depot/aarch64/`.
+3. Document full application inventory and reboot persistence state in `Documentation/gs101/evidence/issue10-image/`.
