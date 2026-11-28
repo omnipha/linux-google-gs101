@@ -26,6 +26,9 @@
 | `CONFIG_BACKLIGHT_PWM` | 4401 | `=y` | Generic PWM-driven backlight driver | **OK**: Built-in (`vmlinux`) |
 | `CONFIG_INPUT_EVDEV` | 2500 | `=m` | Evdev input event interface (`/dev/input/event*`) for touch & buttons | **OK**: Built as module (`evdev.ko`) |
 | `CONFIG_INPUT_UINPUT` | 2669 | `=y` | Userspace input injector (`/dev/uinput`) for on-screen keyboard (Squeekboard) | **OK**: Built-in (`vmlinux`) |
+| `CONFIG_TOUCHSCREEN_SEC_TS` | 2582 | `=m` | Samsung S6SY792 touchscreen driver for Raven (`spi0.0`) | **OK**: Built as module, loaded by `vendor_ramdisk00` |
+| `CONFIG_TOUCHSCREEN_S6SY761` | 2568 | *Not set* | Legacy Samsung S6SY761 touchscreen core driver | **OK (steer36)**: Disabled per Issue #10 to prevent `spi0.0` contention |
+| `CONFIG_TOUCHSCREEN_S6SY761_SPI` | 2570 | *Not set* | Legacy S6SY761 SPI bus binding | **OK (steer36)**: Disabled per Issue #10 |
 | `CONFIG_OF_OVERLAY` | 2003 | `=y` | Core Device Tree overlay application engine | **OK**: Built-in (`vmlinux`) |
 | `CONFIG_OF_DYNAMIC` | 1998 | `=y` | Dynamic device tree modification support | **OK**: Built-in (`vmlinux`) |
 | `CONFIG_OF_RESOLVE` | 2002 | `=y` | Device tree phandle resolution engine for overlays | **OK**: Built-in (`vmlinux`) |
@@ -62,3 +65,13 @@
   - Samsung GS101 uses the S2MPG10 ACPM PMIC. In the Linux kernel driver tree, `drivers/regulator/s2mps11.c` contains full unified support for `samsung,s2mpg10-regulator` enabled under `CONFIG_REGULATOR_S2MPS11=y`.
   - Communication with the PMIC is mediated via `CONFIG_MFD_SEC_ACPM=y` and `CONFIG_EXYNOS_ACPM_PROTOCOL=y`.
   - **Verdict**: All required voltage regulators for the PCIe RC1 and BCM4389 power tree are fully supported and compiled into the kernel.
+
+### 2.4 Touchscreen Subsystem: Removal of Legacy `s6sy761` & Retention of `sec_touch` (`=m`)
+- **Issue #10 Requirement**:
+  "Remove old s6sy761/fts drivers from config so they do not claim spi0.0" and deliver `sec_touch` built-in or in `vendor_boot`/`initramfs`.
+- **DTS Binding**:
+  [gs101-raven.dts](file:///home/gregor/github_repos/linux-google-gs101/arch/arm64/boot/dts/exynos/google/gs101-raven.dts#L121-L125) defines `/delete-node/ touchscreen@0;` and explicitly binds `compatible = "sec,sec_ts"` to `spi_touch` on `spi0.0` with `sec,firmware_name = "s6sy79x.bin"`.
+- **Conflict Resolution (steer36)**:
+  `CONFIG_TOUCHSCREEN_S6SY761`, `CONFIG_TOUCHSCREEN_S6SY761_I2C`, and `CONFIG_TOUCHSCREEN_S6SY761_SPI` were disabled in the worktree `.config` baseline (see [config-touch-prep.md](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/config-touch-prep.md)). `STMFTS` was already disabled, eliminating all rogue SPI touch drivers from claiming `spi0.0`.
+- **Module Delivery & Vermagic Matching**:
+  `CONFIG_TOUCHSCREEN_SEC_TS` remains `=m` (modular) to prevent early boot PMIC regulator race conditions (as analyzed in `cand13-flash-log.md`). The module (`sec_touch.ko`) is packaged into `vendor_ramdisk00` with vermagic strictly matching `7.3.0-rc6-gs101 SMP preempt mod_unload aarch64` (without `+`), ensuring seamless probe at boot per [module-load-matrix.md §2](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/module-load-matrix.md#L47).
