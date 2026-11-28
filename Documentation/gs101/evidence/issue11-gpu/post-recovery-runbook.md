@@ -165,9 +165,10 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 - Confirm kernel boots cleanly on `simpledrm` with zero Panfrost early-boot involvement.
 
 ### Step 4.2: Load Panfrost Modules & Establish Persistence
-Execute `/tmp/opencode/gs101/wlan-bundle/install-gpu.sh` to copy `gpu-sched.ko` and `panfrost.ko` to `/lib/modules/7.3.0-rc6-gs101/extra/`, update dependencies via `depmod -a`, load via `modprobe panfrost`, and configure reboot persistence via `/etc/modules-load.d/panfrost.conf`:
+Execute `Documentation/gs101/tests/install-gpu.sh` (or `/tmp/opencode/gs101/wlan-bundle/install-gpu.sh`) to copy `gpu-sched.ko` and `panfrost.ko` to `/lib/modules/7.3.0-rc6-gs101/extra/`, update dependencies via `depmod -a`, load via `modprobe panfrost`, and configure reboot persistence via `/etc/modules-load.d/panfrost.conf`:
 ```bash
-/tmp/opencode/gs101/wlan-bundle/install-gpu.sh
+Documentation/gs101/tests/install-gpu.sh
+# (Note: /tmp/opencode/gs101/wlan-bundle/install-gpu.sh copy remains valid until next clean checkout)
 ```
 - Verify `/dev/dri/renderD128` exists, dmesg shows Mali G78 model detection (not `mali-unknown`), and no kernel oops/panic occurs.
 - *(Fallback for isolated runtime testing only)*:
@@ -218,9 +219,10 @@ After target reboot, verify persistence of the GPU driver stack and core network
 3. Verify reboot persistence of network routing (default via `172.16.42.2`) and DNS (`1.1.1.1`).
 
 ### Step 5.2: Application Deployment & Inventory
-Execute `/tmp/opencode/gs101/wlan-bundle/install-apps.sh` to configure persistent network routing (`172.16.42.2 dev usb0`), persistent DNS (`1.1.1.1`), and install the minimal application set (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) with automatic offline sideload fallback from the local depot:
+Execute `Documentation/gs101/tests/install-apps.sh` (or `/tmp/opencode/gs101/wlan-bundle/install-apps.sh`) to configure persistent network routing (`172.16.42.2 dev usb0`), persistent DNS (`1.1.1.1`), and install the minimal application set (`foot`, `lxterminal`, `pcmanfm`, `galculator`, `gnome-calculator`) with automatic offline sideload fallback from the local depot:
 ```bash
-/tmp/opencode/gs101/wlan-bundle/install-apps.sh
+Documentation/gs101/tests/install-apps.sh
+# (Note: /tmp/opencode/gs101/wlan-bundle/install-apps.sh copy remains valid until next clean checkout)
 ```
 - *(Fallback: manual copy-paste heredoc commands per [app-availability.md §3.1-§3.2](file:///home/gregor/github_repos/linux-google-gs101/Documentation/gs101/evidence/issue10-image/app-availability.md))*.
 - Verify package registration via `apk info -e` and binary presence via `which`.
@@ -233,7 +235,8 @@ Execute `/tmp/opencode/gs101/wlan-bundle/install-apps.sh` to configure persisten
 Following Candidate 23 flash, boot verification, GPU acceleration, and application deployment, execute the consolidated host-side acceptance test:
 
 ```bash
-/tmp/opencode/gs101/verify-recovery.sh
+Documentation/gs101/tests/verify-recovery.sh
+# (Note: /tmp/opencode/gs101/verify-recovery.sh copy remains valid until next clean checkout)
 ```
 
 ### Acceptance Matrix & Evidence Capture

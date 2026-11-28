@@ -78,7 +78,8 @@ Consolidated path: flashes `boot_a` (`cand22` modular Panfrost + `CONFIG_PCI_EXY
 ### Step 7: Acceptance Verification (`verify-recovery.sh, alle FAIL==0`)
 Following Candidate 23 flash, persistent GPU module activation (`install-gpu.sh`), and application staging (`install-apps.sh`), run the consolidated host-side acceptance test:
 ```bash
-/tmp/opencode/gs101/verify-recovery.sh
+Documentation/gs101/tests/verify-recovery.sh
+# (Note: /tmp/opencode/gs101/verify-recovery.sh copy remains valid until next clean checkout)
 ```
 - **Prerequisite for acceptance**: Script must complete with zero failures (`FAIL == 0`).
 - Generates structured audit evidence at `/tmp/opencode/gs101/evidence/verify-recovery-<timestamp>.json` confirming *Flash != Boot != Bild != Touch != GPU != Apps*.
