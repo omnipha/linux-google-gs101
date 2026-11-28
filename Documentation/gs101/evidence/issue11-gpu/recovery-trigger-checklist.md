@@ -10,7 +10,7 @@
 
 - **Current State**: Device remains powered off since 2026-11-26 04:04:28.
 - **Single Flash Writer Rule**: `cand14-rollback.service` (Main PID `1432080`, armed wait until 2026-11-29 00:11:03) is the **sole authorized flash writer** on the host.
-- **Prohibition**: Never execute `fastboot flash`, `flash-cand20.sh`, or any secondary flash utility while `cand14-rollback.service` is active.
+- **Prohibition**: Never execute `fastboot flash`, `flash-cand20.sh`, `flash-cand21.sh`, `flash-cand22.sh`, `flash-cand23.sh`, or any secondary flash utility while `cand14-rollback.service` is active.
 
 ---
 
@@ -27,7 +27,7 @@ flowchart TD
     E --> F{"Step 4: Verify cand14-rollback.service Status"}
     F -->|Active| G["WAIT: Do not touch flash. Wait for unit termination."]
     F -->|Inactive / Failed| H["Step 5: Execute Phase 2 (Live Panfrost Module Test)"]
-    H --> I["Step 6: Execute Phase 3 (flash-cand21.sh boot_a + vendor_boot_a)"]
+    H --> I["Step 6: Execute Phase 3 (flash-cand23.sh boot_a + vendor_boot_a)"]
 ```
 
 ### Step 1: Detect Host USB CDC-NCM Network Interface (`enx*`)
@@ -67,9 +67,9 @@ Once Steps 1–4 pass:
 2. Load modules with `sudo insmod`.
 3. Verify `/dev/dri/renderD128` and evaluate `dmesg`.
 
-### Step 6: Execute Phase 3 (`flash-cand21.sh`)
+### Step 6: Execute Phase 3 (Consolidated `flash-cand23.sh`)
 Only after Phase 2 confirms zero kernel panics and valid G78 detection:
 ```bash
-/tmp/opencode/gs101/flash-cand21.sh
+/tmp/opencode/gs101/flash-cand23.sh
 ```
-Flashes `boot_a` (`cand20` modular Panfrost) and `vendor_boot_a` (`cand21` corrected USI16/UART16 BT DTB). *(Note: `/tmp/opencode/gs101/flash-cand20.sh` remains available if GPU-only isolation without DTB update is requested)*. Followed by Phase 4 (Boot Verification) and Phase 5 (Issue #10 Application Persistence).
+Consolidated path: flashes `boot_a` (`cand22` modular Panfrost + `CONFIG_PCI_EXYNOS=m`) and `vendor_boot_a` (`cand23` with PCIe RC1 `pcie@14520000` + USI16/UART16 BT DTB). This covers both Issue #11 (GPU) and Issue #8 (WLAN/BT) in a single flash step. *(Note: `flash-cand20.sh` and `flash-cand21.sh` remain available as isolation/fallback paths if isolated GPU-only or BT-only DTB testing is required)*. Followed by Phase 4 (Boot Verification) and Phase 5 (Issue #10 Application Persistence).

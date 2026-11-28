@@ -201,9 +201,14 @@ The bundle layout mirrors the target root filesystem layout:
 │   └── modules/
 │       └── 7.3.0-rc6-gs101/
 │           ├── extra/
+│           │   ├── pci-exynos.ko    # GS101 PCIe RC1 controller (CONFIG_PCI_EXYNOS=m)
 │           │   ├── bcmdhd.ko        # Broadcom FullMAC PCIe driver (vermagic 7.3.0-rc6-gs101)
 │           │   ├── cfg80211.ko      # Linux wireless configuration core
-│           │   └── rfkill.ko        # Radio kill-switch subsystem
+│           │   ├── rfkill.ko        # Radio kill-switch subsystem
+│           │   ├── bluetooth.ko     # Bluetooth core subsystem
+│           │   ├── hci_uart.ko      # HCI UART driver with serdev support
+│           │   ├── btbcm.ko         # Broadcom Bluetooth protocol helper
+│           │   └── btqca.ko         # Qualcomm Bluetooth protocol helper
 │           ├── modules.alias
 │           ├── modules.alias.bin
 │           ├── modules.builtin.alias.bin
@@ -223,9 +228,14 @@ All bundle files have been statically verified against their build origins:
 
 | Relative Bundle Path | Origin / Source | Size (bytes) | SHA-256 Checksum |
 | :--- | :--- | :--- | :--- |
+| `lib/modules/7.3.0-rc6-gs101/extra/pci-exynos.ko` | `/tmp/opencode/gs101/cand22/modules/pci-exynos.ko` | 16,144 | `67e37cd087a2b16b63e8ac578ddcc02a3d7b6e2f3c76ec95c86037ab13d0342d` |
 | `lib/modules/7.3.0-rc6-gs101/extra/bcmdhd.ko` | `/tmp/opencode/gs101/bcmdhd73/bcmdhd.ko` | 8,653,152 | `8f6ad033353aa0c9c9f4eb79d3f301c1727a1b2af9e57d462c82f027f4410ffb` |
 | `lib/modules/7.3.0-rc6-gs101/extra/cfg80211.ko` | `net/wireless/cfg80211.ko` (in-tree) | 1,990,552 | `11a9e57a2fd81d382fab440cd9ef0ed8f039714c9701f6175668d408b97aa987` |
 | `lib/modules/7.3.0-rc6-gs101/extra/rfkill.ko` | `net/rfkill/rfkill.ko` (in-tree) | 61,480 | `7b2e9b268c059fae423afe78ba13c3955a36f8b70d470c37ea4db597de6144d5` |
+| `lib/modules/7.3.0-rc6-gs101/extra/bluetooth.ko` | `/tmp/opencode/gs101/cand22/modules/bluetooth.ko` | 1,509,304 | `321ec87a16000414b389bdf0534b9e50e2445e529b2d9ab183e82d37a420e923` |
+| `lib/modules/7.3.0-rc6-gs101/extra/hci_uart.ko` | `/tmp/opencode/gs101/cand22/modules/hci_uart.ko` | 216,592 | `a5b58650609a3239aee5c982b4a47f79c6756f3b6197669b05986072c97b583c` |
+| `lib/modules/7.3.0-rc6-gs101/extra/btbcm.ko` | `/tmp/opencode/gs101/cand22/modules/btbcm.ko` | 30,976 | `4588764e0cd8b0240e828fbcffdeec56e511759172653e6b4b1590a760da9139` |
+| `lib/modules/7.3.0-rc6-gs101/extra/btqca.ko` | `/tmp/opencode/gs101/cand22/modules/btqca.ko` | 40,328 | `130dd738c7c6d5496fb3dec7a1e4993f0247eb9cc0c18eeadc29001a04e7fb66` |
 | `lib/firmware/fw_bcmdhd.bin` | Extract depot (`firmware/fw_bcmdhd.bin`) | 1,764,018 | `3a6dbf5a726304f83e154ff1b265a06c77d669506eb5c784fd864f10bdda6533` |
 | `lib/firmware/bcmdhd.cal` | Extract depot (`firmware/bcmdhd.cal`) | 24,530 | `a16987752c7de8b026d18c1348f350a48ec062e2570c44d6c778847fab8cc801` |
 | `lib/firmware/bcmdhd_clm.blob` | Extract depot (`firmware/bcmdhd_clm.blob`) | 16,260 | `5ae4086e69f310f7a67df3a1e8e3537f229205c1ce2d7ad520e4217b04044d64` |
@@ -240,12 +250,17 @@ All bundle files have been statically verified against their build origins:
 1. **Module Dependency Tree (`modules.dep`):**
    Generated with `/sbin/depmod -b /tmp/opencode/gs101/wlan-bundle 7.3.0-rc6-gs101`:
    ```
+   extra/bluetooth.ko: extra/rfkill.ko
    extra/rfkill.ko:
+   extra/pci-exynos.ko:
+   extra/btqca.ko: extra/bluetooth.ko extra/rfkill.ko
+   extra/hci_uart.ko: extra/btqca.ko extra/btbcm.ko extra/bluetooth.ko extra/rfkill.ko
    extra/cfg80211.ko: extra/rfkill.ko
+   extra/btbcm.ko: extra/bluetooth.ko extra/rfkill.ko
    extra/bcmdhd.ko: extra/cfg80211.ko extra/rfkill.ko
    ```
 2. **Checksum Integrity:**
-   All 33 files in the bundle match `SHA256SUMS` (`sha256sum -c SHA256SUMS` output: 33 OK, 0 failures).
+   All 38 files in the bundle match `SHA256SUMS` (`sha256sum -c SHA256SUMS` output: 38 OK, 0 failures).
 3. **Firmware Path Verification:**
    Strings embedded in `bcmdhd.ko` (`fw_bcmdhd.bin`, `bcmdhd.cal`, `bcmdhd_clm.blob`, `fw_bcmdhd.map`) match standard `request_firmware()` paths relative to `/lib/firmware/`. Default search path is `/lib/firmware/`; module parameter `firmware_path=/lib/firmware/fw_bcmdhd.bin` and `nvram_path=/lib/firmware/bcmdhd.cal` can be provided optionally.
 
@@ -256,22 +271,32 @@ All bundle files have been statically verified against their build origins:
 > [!IMPORTANT]
 > The physical Pixel 6 Pro device remains powered off awaiting operator physical recovery. `cand14-rollback.service` (PID 1432080, cap Nov 29 00:11:03) remains the sole authorized flash writer. `install-wlan.sh` and flash scripts must NOT be executed while the device is offline or unverified.
 
+### 5.1 Deployment-Reihenfolge nach cand23-Flash
+
 Once physical operator recovery is complete and Fastboot / SSH connectivity is verified:
 
-1. **Bootloader & Device Tree Flash:**
-   - Execute prepared `flash-cand22.sh` and `flash-cand23.sh` to flash `cand22` (`boot_a`, `CONFIG_PCI_EXYNOS=y`) and `cand23` (`vendor_boot_a`, updated DTB containing `pcie@14520000`).
+1. **Bootloader & Device Tree Flash (Consolidated Candidate 23):**
+   - Execute prepared `flash-cand23.sh` to flash:
+     - `boot_a`: `cand22` `boot.img` (`CONFIG_PCI_EXYNOS=m`, `CONFIG_PANFROST=m`)
+     - `vendor_boot_a`: `cand23` `vendor_boot.img` (DTB containing `pcie@14520000` + `usi@175b00c0`/`serial@175b0000`)
+   - Reboots target into Candidate 23.
 2. **Target Sideloading via `install-wlan.sh`:**
-   - Run `/tmp/opencode/gs101/wlan-bundle/install-wlan.sh` to rsync modules and firmware to target (`user@172.16.42.1`), run `depmod -a`, and load modules in order:
+   - Execute `/tmp/opencode/gs101/wlan-bundle/install-wlan.sh` to rsync all 8 modules and firmware blobs to target, run `depmod -a`, and sequentially modprobe:
      ```bash
-     sudo modprobe rfkill && sudo modprobe cfg80211 && sudo modprobe bcmdhd
+     pci-exynos -> rfkill -> cfg80211 -> bcmdhd -> bluetooth -> hci_uart
      ```
-3. **Module Unload Sequence (`unload-wlan.sh`):**
-   - For clean teardown or reconfiguration:
+   - Rationale: `pci-exynos` is isolated as `=m` to prevent early boot panics; it initializes PCIe RC1 and establishes link before `bcmdhd` probes. Bluetooth serdev binds to `serial@175b0000` from cand23 DTB.
+3. **Live Target Verification Criteria:**
+   - **WLAN Criteria**:
+     - Kernel log: `dmesg | grep -iE 'pcie|exynos.*pci'` shows PCIe link up (L0).
+     - Broadcom probe: `dmesg | grep -i dhd` shows BCM4389 (`14e4:4441` or `14e4:4389`) firmware loaded.
+     - Interface: `ip link show wlan0` and `iw dev` show functional wireless interface.
+   - **Bluetooth Criteria**:
+     - Device node: `/sys/class/bluetooth/hci0` created via serdev.
+     - Interface state: `sudo hciconfig hci0 up` succeeds without timeout.
+     - Bluetooth controller: `bluetoothctl show` reports functional Broadcom adapter.
+4. **Module Teardown Sequence (`unload-wlan.sh`):**
+   - In reverse dependency order:
      ```bash
-     sudo rmmod bcmdhd && sudo rmmod cfg80211 && sudo rmmod rfkill
+     sudo rmmod hci_uart btqca btbcm bluetooth bcmdhd cfg80211 rfkill pci-exynos
      ```
-4. **Live Target Verification Commands:**
-   - PCIe discovery: `lspci -nn -k` (expect `14e4:4441` or `14e4:4389` bound to `bcmdhd`).
-   - Interface initialization: `ip link show wlan0` or `iw dev`.
-   - RFKill state: `rfkill list`.
-   - Scan test: `iw dev wlan0 scan`.

@@ -103,7 +103,7 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 
 ---
 
-## Phase 3: Candidate 20/21 Flash Execution (Supervisor Authorized)
+## Phase 3: Candidate 22/23 Flash Execution (Supervisor Authorized Consolidated Path)
 
 **Precondition**: Execute ONLY AFTER Phase 2 live module test completes and supervisor authorizes kernel/vendor flash.
 
@@ -126,13 +126,12 @@ ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_
 >    ```
 > Without `mesa-dri-gallium` (`/usr/lib/dri/panfrost_dri.so`), `WLR_RENDERER=gles2` in Phoc will fail or fall back to software rendering (`llvmpipe`), regardless of `panfrost.ko` loading cleanly.
 
-### Why `vendor_boot` Flash is Required for Bluetooth (Issue #8)
+### Why `vendor_boot` Flash is Required for Bluetooth & Wi-Fi (Issue #8)
 In Android boot header v4, the kernel Device Tree (`DTB`) is delivered by the bootloader from the `vendor_boot` partition (`dtb` region), **not** from `boot.img`.
-- The on-device `vendor_boot_a` (`cand18`, SHA-256 `8a6840fb...`) carries an older DTB (`82ae6a8a...`) that predates the Bluetooth serdev DTS implementation.
-- Flashing `boot_a` alone (`cand20`) leaves the running kernel with the older DTB lacking `usi16: usi@175b00c0` and `serial_16: serial@175b0000`.
-- To enable both GPU Panfrost modular testing (Issue #11) and Bluetooth serdev probing (Issue #8), **Candidate 21** updates both partitions:
-  - `boot_a`: `cand20` `boot.img` (`4c172f54ef5280c3bd63337613fd909f6695ab1d2c777f9913e658f05ca3fcf9`)
-  - `vendor_boot_a`: `cand21` `vendor_boot.img` (`43d5252a016b6b77fa4ed6164da097e84c0c2ce23eb9a9cd640e00209599daf4`)
+- The on-device `vendor_boot_a` (`cand18`, SHA-256 `8a6840fb...`) carries an older DTB (`82ae6a8a...`) that predates Bluetooth and PCIe DTS implementations.
+- To enable GPU Panfrost modular testing (Issue #11), PCIe RC1 root complex activation, and Bluetooth serdev probing (Issue #8) in one consolidated deployment, **Candidate 23** updates both partitions:
+  - `boot_a`: `cand22` `boot.img` (modular Panfrost + `CONFIG_PCI_EXYNOS=m`)
+  - `vendor_boot_a`: `cand23` `vendor_boot.img` (DTB containing `pcie@14520000` + `usi@175b00c0`/`serial@175b0000`)
 
 ### Step 3.1: Verify Rollback Unit is Inactive
 Ensure `cand14-rollback.service` is no longer active:
@@ -141,21 +140,24 @@ systemctl --user is-active cand14-rollback.service
 # Must be 'inactive' or 'failed' (completed), NOT running.
 ```
 
-### Step 3.2: Execute Candidate 21 Flash Script
+### Step 3.2: Execute Consolidated Candidate 23 Flash Script
 Run the prepared single-shot flash script:
 ```bash
-/tmp/opencode/gs101/flash-cand21.sh
+/tmp/opencode/gs101/flash-cand23.sh
 ```
-- Flashes `cand20` `boot_a` + `cand21` `vendor_boot_a`.
-- Reboots device into Candidate 21.
-- Structured JSON output written to `/tmp/opencode/gs101/evidence/flash-cand21-*.json`.
-- *(Alternative for isolated GPU test only)*: `/tmp/opencode/gs101/flash-cand20.sh` (flashes only `boot_a`).
+- Flashes `cand22` `boot_a` + `cand23` `vendor_boot_a`.
+- Reboots device into Candidate 23.
+- Structured JSON output written to `/tmp/opencode/gs101/evidence/flash-cand23-*.json`.
+- *(Fallback / Isolation paths)*:
+  - `/tmp/opencode/gs101/flash-cand20.sh` (isolated GPU `boot_a` only)
+  - `/tmp/opencode/gs101/flash-cand21.sh` (GPU + BT DTB without PCIe RC1)
+  - `/tmp/opencode/gs101/flash-cand22.sh` (`cand22` `boot_a` only)
 
 ---
 
-## Phase 4: Candidate 20 Boot Verification & Phoc Acceleration
+## Phase 4: Candidate 22/23 Boot Verification, GPU Acceleration & WLAN/BT Staging
 
-### Step 4.1: Verify Candidate 20 Boot & Simpledrm Display
+### Step 4.1: Verify Candidate 22/23 Boot & Simpledrm Display
 ```bash
 ssh -i ~/.ssh/id_ed25519 -o UserKnownHostsFile=/tmp/opencode/gs101/issue4/known_hosts \
     user@172.16.42.1 'uname -a; cat /proc/cmdline; ls -la /dev/dri/'
